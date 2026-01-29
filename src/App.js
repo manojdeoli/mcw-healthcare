@@ -1,0 +1,1154 @@
+import React, { useState, useEffect, useRef } from 'react';
+import './App.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
+import { format } from 'date-fns';
+import * as api from './api';
+import authService from './auth';
+import { formFields } from './formFields';
+import ambulanceIconPng from './ambulance.png';
+import patientIconPng from './patient.png';
+
+
+// --- Fix for Leaflet's default icon ---
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: iconRetina,
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+});
+// --- End of fix ---
+
+// --- Dummy Booking Data & Initial Time ---
+const getInitialArtificialTime = (mode) => {
+  const checkInDate = new Date();
+  checkInDate.setHours(15, 0, 0, 0); // Today at 3:00 PM
+
+  const checkOutDate = new Date(checkInDate);
+  checkOutDate.setDate(checkOutDate.getDate() + 1);
+  checkOutDate.setHours(11, 0, 0, 0); // Tomorrow at 11:00 AM
+
+  if (mode === 'arrival') {
+    return new Date(checkInDate.getTime() - 30 * 60 * 1000); // Start clock 30 minutes before check-in
+  }
+  return new Date(checkOutDate.getTime() - 30 * 60 * 1000); // Start clock 30 minutes before check-out
+};
+// --- End of Data & Initial Time ---
+
+// --- Location Simulation Data ---
+
+
+const generateRoute = (start, end, sections = 10) => {
+  if (!start) return [end];
+  const route = [start];
+  const latDiff = (end.lat - start.lat) / sections;
+  const lngDiff = (end.lng - start.lng) / sections;
+
+  for (let i = 1; i < sections; i++) {
+    route.push({
+      lat: start.lat + latDiff * i,
+      lng: start.lng + lngDiff * i,
+    });
+  }
+  route.push(end);
+  return route;
+};
+
+// --- End of Location Simulation Data ---
+
+function getDistance(coords1, coords2) {
+  const R = 6371e3; // metres
+  const φ1 = coords1.lat * Math.PI / 180;
+  const φ2 = coords2.lat * Math.PI / 180;
+  const Δφ = (coords2.lat - coords1.lat) * Math.PI / 180;
+  const Δλ = (coords2.lng - coords1.lng) * Math.PI / 180;
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulationMode }) => {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const mapUpdateThrottle = useRef(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+
+  useEffect(() => {
+    if (mapRef.current && !mapInstanceRef.current) {
+      if (mapRef.current._leaflet_id) mapRef.current._leaflet_id = null;
+      const map = L.map(mapRef.current).setView([-33.8688, 151.2093], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      mapInstanceRef.current = map;
+      setIsMapReady(true);
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.warn("Map cleanup error", e);
+        }
+        mapInstanceRef.current = null;
+        setIsMapReady(false);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const mapInstance = mapInstanceRef.current;
+    if (isMapReady && mapInstance && userGps && hospitalLocation) {
+      mapInstance.invalidateSize();
+      mapInstance.eachLayer((layer) => {
+        if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline || !layer._url) { // Keep tile layer
+          mapInstance.removeLayer(layer);
+        }
+      });
+
+      if (verifiedPhoneNumber && userGps && hospitalLocation && !mapUpdateThrottle.current) {
+        mapUpdateThrottle.current = setTimeout(() => {
+          mapUpdateThrottle.current = null;
+        }, 1000);
+
+        const updateMapView = () => {
+          const distance = getDistance(userGps, hospitalLocation);
+          const ZOOM_START_RADIUS = 2000;
+          const MIN_ZOOM = 12;
+          const MAX_ZOOM = 18;
+
+          let newZoom;
+          if (distance >= ZOOM_START_RADIUS) {
+            newZoom = MIN_ZOOM;
+          } else {
+            const zoomProgress = 1 - (distance / ZOOM_START_RADIUS);
+            newZoom = MIN_ZOOM + (MAX_ZOOM - MIN_ZOOM) * zoomProgress;
+          }
+
+          const midLat = (userGps.lat + hospitalLocation.lat) / 2;
+          const midLng = (userGps.lng + hospitalLocation.lng) / 2;
+
+          mapInstance.setView([midLat, midLng], newZoom, { animate: true, pan: { duration: 2.5 } });
+        }
+        if (verifiedPhoneNumber) {
+          updateMapView();
+        }
+      }
+
+      if (hospitalLocation && hospitalLocation.lat && hospitalLocation.lng) {
+        const hospitalIcon = L.divIcon({
+          html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#FF0000" width="32px" height="32px"><path d="M18 13h-5v5h-2v-5H6v-2h5V6h2v5h5v2z"/><path d="M0 0h24v24H0z" fill="none"/></svg>`,
+          className: 'hospital-location-icon',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+        });
+        L.marker([hospitalLocation.lat, hospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Wellsoon Hospital');
+
+        L.circle([hospitalLocation.lat, hospitalLocation.lng], {
+          color: 'red',
+          fillColor: '#ff0000',
+          fillOpacity: 0.2,
+          radius: 100
+        }).addTo(mapInstance).bindPopup('Hospital Check-in Area');
+      }
+
+      if (userGps && verifiedPhoneNumber) {
+        const iconUrl = simulationMode === 'departure' ? patientIconPng : ambulanceIconPng;
+        const userIcon = L.icon({
+          iconUrl: iconUrl,
+          iconSize: [32, 32],
+          iconAnchor: [20, 40],
+          popupAnchor: [0, -32]
+        });
+
+        L.marker([userGps.lat, userGps.lng], { icon: userIcon }).addTo(mapInstance).bindPopup('User Location');
+      }
+    }
+  }, [userGps, verifiedPhoneNumber, hospitalLocation, isMapReady, simulationMode]);
+
+  return <div id="map" ref={mapRef} style={{ height: '530px', width: '100%' }}></div>;
+};
+
+const ApiLogsView = ({ apiLogs, onClear, maxHeight }) => (
+  <div className="card">
+    <div className="card-header d-flex justify-content-between align-items-center">
+      <h2 className="mb-0">Real-time Network API Logs</h2>
+      <button className="btn btn-sm btn-outline-secondary" onClick={onClear}>Clear</button>
+    </div>
+    <div className="p-3" style={maxHeight ? { maxHeight, overflowY: 'auto' } : {}}>
+      {apiLogs.length === 0 && <p>No API interactions yet. Start a sequence in Patient Dashboard.</p>}
+      {apiLogs.map(log => (
+        <div key={log.id} style={{ border: '1px solid #ccc', marginBottom: '15px', borderRadius: '5px', overflow: 'hidden' }}>
+          <div style={{ background: '#e9ecef', padding: '10px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>
+            {log.timestamp.split('T')[1].split('.')[0]} - {log.title}
+          </div>
+          <div style={{ display: 'flex', fontSize: '0.9em' }}>
+            <div style={{ flex: 1, padding: '10px', borderRight: '1px solid #eee', background: '#fff' }}>
+              <strong>Request:</strong>
+              <div style={{ color: '#0056b3', marginBottom: '5px' }}>{log.method} {log.url}</div>
+              <pre style={{ background: '#f8f9fa', padding: '5px', borderRadius: '3px', overflowX: 'auto' }}>{JSON.stringify(log.request, null, 2)}</pre>
+            </div>
+            <div style={{ flex: 1, padding: '10px', background: '#fff' }}>
+              <strong>Response:</strong>
+              <pre style={{ background: '#f8f9fa', padding: '5px', borderRadius: '3px', overflowX: 'auto' }}>{JSON.stringify(log.response, null, 2)}</pre>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [activeScreen, setActiveScreen] = useState(1);
+  const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState(() => {
+    const stored = localStorage.getItem('verifiedPhoneNumber');
+    return (stored && stored !== 'null' && stored !== 'undefined') ? stored : null;
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [kycMatchResponse, setKycMatchResponse] = useState(null);
+  const [location, setLocation] = useState(null);
+  // New state variables based on the plan
+  const [simulationMode, setSimulationMode] = useState('arrival'); // 'arrival' or 'departure'
+  const [registrationStatus, setRegistrationStatus] = useState('Not Registered');
+  const [artificialTime, setArtificialTime] = useState(null);
+  const [identityIntegrity, setIdentityIntegrity] = useState('Bad');
+  const [patientStatus, setPatientStatus] = useState('Not Checked In');
+  const [paymentStatus, setPaymentStatus] = useState('Not Paid');
+  const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
+  const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
+  const [hospitalLocation, setHospitalLocation] = useState(null);
+  const [userGps, setUserGps] = useState(null);
+  const [initialUserLocation, setInitialUserLocation] = useState(null);
+  const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
+  const [patientMedicalDetails, setPatientMedicalDetails] = useState({
+    esi: '',
+    vitals: '',
+    complaint: '',
+    eta: '',
+  });
+
+  const [messages, setMessages] = useState([]);
+  const [apiLogs, setApiLogs] = useState([]);
+  
+  // Initialize authentication on app start
+  useEffect(() => {
+    console.log('🚀 App mounted, checking for auth callback...');
+    
+    // Check if returning from OAuth redirect
+    const checkAuth = async () => {
+      const authResult = await authService.checkAndHandleCallback();
+      
+      console.log('📝 Auth result:', authResult);
+      
+      if (authResult) {
+        if (authResult.success) {
+          setIsAuthenticated(true);
+          setVerifiedPhoneNumber(authResult.phoneNumber);
+          localStorage.setItem('verifiedPhoneNumber', authResult.phoneNumber);
+          broadcast('SET_VERIFIED_PHONE', authResult.phoneNumber);
+          addMessage('Authentication successful! You can now use number verification API.');
+        } else if (authResult.error) {
+          setAuthError(authResult.error);
+          addMessage(`Authentication failed: ${authResult.error}`);
+        }
+        return;
+      }
+      
+      // Check if we already have authentication state
+      if (authService.isAuthenticated()) {
+        setIsAuthenticated(true);
+        addMessage('Authentication restored from previous session.');
+      }
+    };
+    
+    checkAuth();
+  }, []);
+
+  // --- Broadcast Channel for Cross-Tab Sync ---
+  const channelRef = useRef(null);
+
+  useEffect(() => {
+    channelRef.current = new BroadcastChannel('healthcare_demo_sync_v2');
+    channelRef.current.onmessage = (event) => {
+      const { type, data } = event.data;
+      switch (type) {
+        case 'SET_VERIFIED_PHONE':
+          setVerifiedPhoneNumber(data);
+          break;
+        case 'SET_IDENTITY_INTEGRITY':
+          setIdentityIntegrity(data);
+          break;
+        case 'SET_REGISTRATION_STATUS':
+          setRegistrationStatus(data);
+          break;
+        case 'SET_PATIENT_STATUS':
+          setPatientStatus(data);
+          break;
+        case 'SET_PAYMENT_STATUS':
+          setPaymentStatus(data);
+          break;
+        case 'SET_GEOFENCING_SUB_ID':
+          setGeofencingSubscriptionId(data);
+          break;
+        case 'SET_OUTPATIENT_STATUS':
+          setOutpatientStatus(data);
+          break;
+        case 'SET_HOSPITAL_LOCATION':
+          setHospitalLocation(data);
+          break;
+        case 'SET_USER_GPS':
+          setUserGps(data);
+          break;
+        case 'SET_INITIAL_USER_LOCATION':
+          setInitialUserLocation(data);
+          break;
+        case 'SET_MEDICAL_DETAILS':
+          setPatientMedicalDetails(data);
+          break;
+        case 'ADD_MESSAGE':
+          setMessages(prev => {
+             if (prev.includes(data)) return prev;
+             return [...prev, data];
+          });
+          break;
+        case 'SET_ARTIFICIAL_TIME':
+          setArtificialTime(data ? new Date(data) : null);
+          break;
+        case 'SET_FORM_STATE':
+          setFormState(data);
+          break;
+        case 'SET_KYC_MATCH_RESPONSE':
+          setKycMatchResponse(data);
+          break;
+        case 'SET_LAST_INTEGRITY_CHECK_TIME':
+          setLastIntegrityCheckTime(data ? new Date(data) : null);
+          break;
+        case 'ADD_API_LOG':
+          setApiLogs(prev => [data, ...prev]);
+          break;
+        default: break;
+      }
+    };
+    return () => channelRef.current?.close();
+  }, []);
+
+  const broadcast = (type, data) => {
+    channelRef.current?.postMessage({ type, data });
+  };
+
+  // Sync Wrappers
+  const syncSetUserGps = (val) => { setUserGps(val); broadcast('SET_USER_GPS', val); };
+  const syncSetPatientStatus = (val) => { setPatientStatus(val); broadcast('SET_PATIENT_STATUS', val); };
+  const syncSetPaymentStatus = (val) => { setPaymentStatus(val); broadcast('SET_PAYMENT_STATUS', val); };
+  const syncSetGeofencingSubscriptionId = (val) => { setGeofencingSubscriptionId(val); broadcast('SET_GEOFENCING_SUB_ID', val); };
+  const syncSetPatientMedicalDetails = (val) => {
+    setPatientMedicalDetails(prev => {
+        const newData = typeof val === 'function' ? val(prev) : val;
+        broadcast('SET_MEDICAL_DETAILS', newData);
+        return newData;
+    });
+  };
+  const syncSetArtificialTime = (val) => { setArtificialTime(val); broadcast('SET_ARTIFICIAL_TIME', val); };
+  const syncSetOutpatientStatus = (val) => { setOutpatientStatus(val); broadcast('SET_OUTPATIENT_STATUS', val); };
+  const syncSetIdentityIntegrity = (val) => { setIdentityIntegrity(val); broadcast('SET_IDENTITY_INTEGRITY', val); };
+  const syncSetRegistrationStatus = (val) => { setRegistrationStatus(val); broadcast('SET_REGISTRATION_STATUS', val); };
+  const syncSetHospitalLocation = (val) => { setHospitalLocation(val); broadcast('SET_HOSPITAL_LOCATION', val); };
+  const syncSetInitialUserLocation = (val) => { setInitialUserLocation(val); broadcast('SET_INITIAL_USER_LOCATION', val); };
+  const syncSetFormState = (val) => {
+    setFormState(prev => {
+        const newData = typeof val === 'function' ? val(prev) : val;
+        broadcast('SET_FORM_STATE', newData);
+        return newData;
+    });
+  };
+  const syncSetKycMatchResponse = (val) => { setKycMatchResponse(val); broadcast('SET_KYC_MATCH_RESPONSE', val); };
+  const syncSetLastIntegrityCheckTime = (val) => { setLastIntegrityCheckTime(val); broadcast('SET_LAST_INTEGRITY_CHECK_TIME', val); };
+  const syncSetLocation = (val) => { setLocation(val); }; // Location object not strictly synced for map, userGps is used
+
+  const addMessage = (message) => {
+    setMessages(prevMessages => {
+      const newMessage = `${new Date().toLocaleTimeString()}: ${message}`;
+      if (prevMessages.includes(newMessage)) {
+        return prevMessages;
+      }
+      broadcast('ADD_MESSAGE', newMessage);
+      return [...prevMessages, newMessage];
+    });
+  };
+
+  const logApiInteraction = (title, method, url, request, response) => {
+    const logEntry = {
+      id: Date.now() + Math.random(),
+      timestamp: new Date().toISOString(),
+      title,
+      method,
+      url,
+      request,
+      response
+    };
+    setApiLogs(prev => [logEntry, ...prev]);
+    broadcast('ADD_API_LOG', logEntry);
+  };
+
+
+  // --- State Persistence Logic ---
+  // On component mount, load state from localStorage
+
+  const [isSequenceRunning, setIsSequenceRunning] = useState(false);
+  const userProfileRef = useRef(null);
+  const [formState, setFormState] = useState(
+    formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {})
+  );
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    syncSetFormState(prevState => ({ ...prevState, [name]: value }));
+    if (kycMatchResponse) {
+      syncSetKycMatchResponse(null);
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    setPhone(e.target.value);
+    setSuccess('');
+    setError('');
+  };
+
+  useEffect(() => {
+    if (verifiedPhoneNumber) {
+      localStorage.setItem('verifiedPhoneNumber', verifiedPhoneNumber);
+    }
+  }, [verifiedPhoneNumber]);
+
+  useEffect(() => {
+    // Auto-scroll all log containers
+    const containers = document.querySelectorAll('.log-container');
+    containers.forEach(container => {
+      container.scrollTop = container.scrollHeight;
+    });
+  }, [messages, activeScreen]);
+
+  const getVerifiedNumber = () => verifiedPhoneNumber || localStorage.getItem('verifiedPhoneNumber');
+
+  const handleRegistrationSequence = async () => {
+    const phone = getVerifiedNumber();
+    if (!phone) {
+      alert('Please verify your phone number first to start registration.');
+      return;
+    }
+    addMessage("Starting Registration Sequence...");
+
+    // 1. Use KYC Fill to partially populate
+    addMessage("Partially populating form with KYC Fill...");
+    const kycData = await api.kycFill(phone);
+    // Note: kycFill is internal logic, not strictly a network API in this demo, but we can log it if desired.
+    syncSetFormState(kycData);
+
+    // 3. Wait and call KYC Match
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    addMessage("Calling KYC Match...");
+    
+    const kycReq = {
+      phoneNumber: phone,
+      email: kycData.email,
+      address: kycData.address,
+      birthdate: kycData.birthdate,
+      name: kycData.name
+    };
+    const kycMatchData = await api.kycMatch(kycReq);
+    logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', kycReq, kycMatchData);
+
+    syncSetKycMatchResponse(kycMatchData);
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const allFieldsMatch = !Object.values(kycMatchData).includes('false');
+    if (allFieldsMatch) {
+      addMessage('KYC Match successful. Proceed with check-in.');
+      syncSetRegistrationStatus('Registered');
+    } else {
+      syncSetRegistrationStatus('Not Registered'); // Explicitly ensure status is not registered
+      addMessage('KYC Match failed for some fields. Please correct and re-submit.');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      userProfileRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const submitKyc = async () => {
+    const phone = getVerifiedNumber();
+    if (!phone) {
+      alert('Please verify your phone number first.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const kycReq = {
+        phoneNumber: phone,
+        email: formState.email,
+        address: formState.address,
+        birthdate: formState.birthdate,
+        name: formState.name
+      };
+      const kycData = await api.kycMatch(kycReq);
+      logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', kycReq, kycData);
+
+      syncSetKycMatchResponse(kycData);
+
+      // Check if all fields are true after the match
+      const allFieldsMatch = !Object.values(kycData).includes('false');
+      if (allFieldsMatch) {
+        syncSetRegistrationStatus('Registered');
+        addMessage('KYC Match successful. Proceed with check-in.');
+      }
+
+    } catch (err) {
+      console.error('KYC Match failed:', err);
+      addMessage(`KYC Match API Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Identity Integrity Timeout Logic ---
+  useEffect(() => {
+    if (identityIntegrity === 'Good' && lastIntegrityCheckTime && artificialTime) {
+      const timeoutMs = 24 * 60 * 60 * 1000; // Increased to 24 hours for demo
+      const timeSinceCheck = artificialTime.getTime() - lastIntegrityCheckTime.getTime();
+
+      if (timeSinceCheck > timeoutMs) {
+        syncSetIdentityIntegrity('Bad');
+        addMessage("Identity Integrity Check Expired (24 Hour Timeout)");
+      }
+    }
+  }, [artificialTime, identityIntegrity, lastIntegrityCheckTime]);
+
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    if (isSequenceRunning && verifiedPhoneNumber) {
+      const timer = setInterval(() => {
+        setArtificialTime(prevTime => {
+            const newTime = prevTime ? new Date(prevTime.getTime() + 50000) : getInitialArtificialTime(simulationMode);
+            broadcast('SET_ARTIFICIAL_TIME', newTime);
+            return newTime;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isSequenceRunning, verifiedPhoneNumber, simulationMode]);
+
+  // Authentication handler
+  const handleAuthentication = async () => {
+    const phoneToUse = phone || getVerifiedNumber();
+    if (!phoneToUse) {
+      alert('Please enter a phone number first.');
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setAuthError('');
+    
+    try {
+      await authService.authenticate(phoneToUse, addMessage);
+      setIsAuthenticated(true);
+      addMessage('Authentication successful! You can now use number verification API.');
+    } catch (error) {
+      console.error('Authentication failed:', error);
+      setAuthError(`Authentication failed: ${error.message}`);
+      addMessage(`Authentication failed: ${error.message}`);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const validatePhone = async (e) => {
+    e.preventDefault();
+    const fullPhoneNumber = phone.replace(/\s/g, '');
+    const regex = /^\+\d{10,15}$/
+    setError('');
+    setSuccess('');
+
+    if (!regex.test(fullPhoneNumber)) {
+      setError('Please enter a valid international phone number (e.g., +61412345678).');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setError('Please authenticate first before verifying phone number.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const verificationData = await api.verifyPhoneNumber(fullPhoneNumber);
+      logApiInteraction('Number Verification', 'POST', '/number-verification/number-verification/v0/verify', { phoneNumber: fullPhoneNumber }, verificationData);
+
+      if (verificationData.devicePhoneNumberVerified === true) {
+        addMessage("Phone number is verified...");
+        setSuccess('Phone number is verified.');
+        setVerifiedPhoneNumber(fullPhoneNumber);
+        localStorage.setItem('verifiedPhoneNumber', fullPhoneNumber);
+        broadcast('SET_VERIFIED_PHONE', fullPhoneNumber);
+      } else {
+        setError(`Phone number verification failed.`);
+      }
+    } catch (err) {
+      console.error('API call failed:', err);
+      setError('An error occurred during verification. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const checkIdentityIntegrity = async (loader) => {
+    const phone = getVerifiedNumber();
+    if (!phone) {
+      alert('Please verify phone number first.');
+      return false;
+    }
+    setIsLoading(loader);
+    setIdentityIntegrity('Checking...');
+    try {
+      const simSwapReq = { phoneNumber: phone, maxAge: 240 };
+      const simSwapResult = await api.simSwap(phone); // api.simSwap arg is phone, but internally it mocks the req.
+      logApiInteraction('SIM Swap', 'POST', '/sim-swap/sim-swap/v0/check', simSwapReq, simSwapResult);
+
+      const deviceSwapReq = { phoneNumber: phone, maxAge: 240 };
+      const deviceSwapResult = await api.deviceSwap(phone);
+      logApiInteraction('Device Swap', 'POST', '/device-swap/device-swap/v1/check', deviceSwapReq, deviceSwapResult);
+
+      const isSimSwapped = simSwapResult && simSwapResult.swapped === true;
+      const isDeviceSwapped = deviceSwapResult && deviceSwapResult.swapped === true;
+
+      if (isSimSwapped || isDeviceSwapped) {
+        syncSetIdentityIntegrity('Bad');
+        addMessage(`Identity Integrity Check Failed. SIM: ${isSimSwapped}, Device: ${isDeviceSwapped}`);
+      } else {
+        // Use artificial time if running, otherwise use current real time to ensure we have a baseline
+        const checkTime = artificialTime ? new Date(artificialTime.getTime()) : new Date();
+        syncSetLastIntegrityCheckTime(checkTime);
+        syncSetIdentityIntegrity('Good');
+        addMessage(`Identity Integrity Verified`);
+      }
+      return true;
+    } catch (err) {
+      console.error('Identity integrity check failed:', err);
+      syncSetIdentityIntegrity('Bad');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderMatchStatus = (status, fieldName) => {
+    if (status === null || status === undefined || status === 'true') {
+      return null;
+    }
+
+    let text = '';
+    if (status === 'false') {
+      text = 'Not Match';
+    } else if (status === 'not_available') {
+      text = 'Not Available';
+    }
+
+    return (
+      <div className="status-text-error">{text}</div>
+    );
+  };
+
+  const handlePatientSequence = async (mode) => {
+    const phone = getVerifiedNumber();
+    if (!phone) {
+      alert('Please verify your phone number first.');
+      return;
+    }
+
+    if (mode === 'departure' && patientStatus !== 'Checked In') {
+      addMessage("Patient is not Checked In.");
+      return;
+    }
+
+    setIsSequenceRunning(true);
+    try {
+      const startTime = getInitialArtificialTime(mode);
+      
+      // Update integrity timestamp BEFORE artificial time to prevent race condition timeout
+      if (identityIntegrity === 'Good') {
+        syncSetLastIntegrityCheckTime(startTime);
+      }
+      syncSetArtificialTime(startTime);
+      setSimulationMode(mode);
+      if (mode === 'arrival') {
+        setIsLoading(true);
+        // Fetch actual hotel location
+        const hospitalLocationData = await api.locationRetrieval(phone);
+        logApiInteraction('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', { device: { phoneNumber: phone } }, hospitalLocationData);
+
+        const actualHotelCoords = {
+          lat: hospitalLocationData.area.center.latitude,
+          lng: hospitalLocationData.area.center.longitude
+        };
+        syncSetHospitalLocation(actualHotelCoords);
+
+        // Set initial user location slightly away from the hotel
+        const userStartLat = actualHotelCoords.lat + 0.05; // 0.05 degrees ~ 5.5 km
+        const userStartLng = actualHotelCoords.lng + 0.05;
+        const initialUserCoords = { lat: userStartLat, lng: userStartLng };
+
+        syncSetInitialUserLocation(initialUserCoords);
+        syncSetUserGps(initialUserCoords);
+        setIsLoading(false);
+
+        const subId = await api.startMedicalTransportSequence(
+          phone,
+          initialUserCoords, // Use the newly set initialUserCoords
+          actualHotelCoords, // Use the newly fetched actualHotelCoords
+          addMessage,
+          syncSetLocation,
+          syncSetUserGps,
+          syncSetPatientStatus,
+          syncSetPatientMedicalDetails,
+          generateRoute,
+          syncSetArtificialTime,
+          logApiInteraction
+        );
+        if (subId) syncSetGeofencingSubscriptionId(subId);
+      } else if (mode === 'departure') {
+        const guestName = formState.name ? `${formState.name}` : 'Patient';
+        await api.startPatientAbscondmentSequence(
+          phone,
+          initialUserLocation,
+          hospitalLocation,
+          addMessage,
+          syncSetLocation,
+          syncSetUserGps,
+          syncSetPatientStatus,
+          syncSetPatientMedicalDetails,
+          generateRoute,
+          syncSetArtificialTime,
+          guestName,
+          logApiInteraction,
+          syncSetPaymentStatus,
+          geofencingSubscriptionId
+        );
+
+        setTimeout(() => {
+          addMessage("Resetting application state to defaults...");
+          syncSetRegistrationStatus('Not Registered');
+          syncSetIdentityIntegrity('Bad');
+          syncSetPatientStatus('Not Checked In');
+          syncSetPaymentStatus('Not Paid');
+          syncSetGeofencingSubscriptionId(null);
+          syncSetOutpatientStatus('Inactive');
+          syncSetHospitalLocation(null);
+          syncSetUserGps(null);
+          syncSetInitialUserLocation(null);
+          syncSetLastIntegrityCheckTime(null);
+          syncSetPatientMedicalDetails({
+            esi: '',
+            vitals: '',
+            complaint: '',
+            eta: '',
+          });
+          syncSetKycMatchResponse(null);
+          syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
+          syncSetArtificialTime(null);
+          setVerifiedPhoneNumber(null);
+          localStorage.removeItem('verifiedPhoneNumber');
+          broadcast('SET_VERIFIED_PHONE', null);
+          setPhone('');
+          setSuccess('');
+          setSimulationMode('arrival');
+        }, 15000);
+      }
+    } catch (error) { // eslint-disable-line no-empty
+      console.error('Sequence failed:', error);
+      addMessage(`Error during sequence: ${error.message}`);
+    } finally {
+      // You might want to set this to false when the sequence is fully complete
+    }
+  };
+
+  const handleOutpatientSequence = async () => {
+    const phone = getVerifiedNumber();
+    if (!phone) {
+      alert('Please verify your phone number first.');
+      return;
+    }
+    
+    syncSetArtificialTime(new Date());
+    setIsSequenceRunning(true);
+    syncSetOutpatientStatus("Initializing...");
+    
+    try {
+        let startLoc = initialUserLocation;
+        if (!startLoc) {
+             addMessage("Fetching current location for monitoring baseline...");
+             const locData = await api.locationRetrieval(phone);
+             logApiInteraction('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', { device: { phoneNumber: phone } }, locData);
+             startLoc = { lat: locData.area.center.latitude, lng: locData.area.center.longitude };
+             syncSetInitialUserLocation(startLoc);
+             syncSetUserGps(startLoc);
+        }
+
+        await api.startOutpatientMonitoringSequence(phone, startLoc, addMessage, syncSetLocation, syncSetUserGps, syncSetOutpatientStatus, syncSetArtificialTime, logApiInteraction);
+    } catch (e) {
+        console.error(e);
+        addMessage("Error in monitoring sequence: " + e.message);
+    }
+  };
+
+  return (
+    <div className="App">
+      {isLoading &&
+        <div className="loader-overlay">
+          <div className="d-flex justify-content-center align-items-center h-100">
+            <div className="spinner-border text-light" style={{ width: '3rem', height: '3rem' }} role="status">
+              <span className="sr-only">Loading...</span>
+            </div>
+          </div>
+        </div>
+      }
+      <header className="header">
+        <h1><a href="/" className="header-link">Healthcare Use Case Demo</a></h1>
+      </header>
+
+      <nav className="screen-nav" style={{ background: '#f0f0f0', padding: '10px', textAlign: 'center', marginBottom: '20px' }}>
+        <button className={`btn ${activeScreen === 1 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(1)}>1. API Interactions</button>
+        <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(2)}>2. Patient Dashboard</button>
+        <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>3. All Details</button>
+      </nav>
+
+      <main className="main-content">
+        <div className="dashboard-container">
+          {/* Main two-column layout */}
+          <div className="dashboard-main" style={{ display: activeScreen === 3 ? 'flex' : 'block', gap: '20px' }}>
+            
+            {/* SCREEN 1: API Interactions */}
+            {activeScreen === 1 && (
+            <div className="dashboard-column" style={{ width: '100%', maxWidth: '100%' }}>
+              <ApiLogsView apiLogs={apiLogs} onClear={() => setApiLogs([])} />
+            </div>
+            )}
+
+            {/* SCREEN 2: Patient Dashboard (Aggregated View) */}
+            {activeScreen === 2 && (
+            <div className="dashboard-column" style={{ width: '100%', maxWidth: '100%' }}>
+              {/* Controls (Automated Sequences) */}
+              <div id="apiActions" className="card">
+                <div className="card-header d-flex justify-content-between align-items-center">
+                  <h2 className="mb-0">Controls & Sequences</h2>
+                  <button className="btn btn-sm btn-outline-secondary" onClick={() => setMessages([])}>Clear Logs</button>
+                </div>
+                <div className="p-3">
+                  <div className="api-buttons">
+                    <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
+                    {patientStatus !== 'Checked In' && (
+                      <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Medical Details Entry and Transport</button>
+                    )}
+                    {patientStatus === 'Checked In' && <>
+                      <button className="btn btn-primary" onClick={() => handlePatientSequence('departure')}>Patient Abscondment</button>
+                    </>}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '300px' }}>
+              {/* Phone Verification */}
+              <div id="verification-container" className="card">
+                <h2 className="card-header">1. Phone Verification</h2>
+                <div className="p-3">
+                  {/* Authentication Section */}
+                  <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa' }}>
+                    <h5>Authentication Required</h5>
+                    <p>Before using number verification, you need to authenticate with the OAuth2 flow.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <button 
+                        className={`btn ${isAuthenticated ? 'btn-success' : 'btn-warning'}`} 
+                        onClick={handleAuthentication}
+                        disabled={isAuthenticating || (!phone && !getVerifiedNumber())}
+                      >
+                        {isAuthenticating ? 'Authenticating...' : isAuthenticated ? 'Authenticated ✓' : 'Authenticate'}
+                      </button>
+                      <span style={{ color: isAuthenticated ? 'green' : 'orange' }}>
+                        {isAuthenticated ? 'Ready to use APIs' : 'Authentication required'}
+                      </span>
+                    </div>
+                    {authError && <div className="alert alert-danger" style={{ marginTop: '10px' }}>{authError}</div>}
+                    {!phone && !getVerifiedNumber() && <div className="alert alert-info" style={{ marginTop: '10px' }}>Enter a phone number first</div>}
+                  </div>
+                  
+                  <form onSubmit={validatePhone}>
+                    <div className="verify-form-container">
+                      <div className="form-group">
+                        <input type="text" id="phone" className="form-control" placeholder="e.g., +61412345678" value={phone} onChange={handlePhoneChange} />
+                      </div>
+                      <button type="submit" id="verifyBtn" className="btn btn-primary" disabled={!isAuthenticated}>Verify</button>
+                    </div>
+                    {error && <div id="error" className="alert alert-danger">{error}</div>}
+                    {success && <div id="success" className="alert alert-success">{success}</div>}
+                    {!verifiedPhoneNumber && !error && <div className="alert alert-info">Please authenticate and verify the phone number.</div>}
+                  </form>
+                </div>
+              </div>
+
+              {/* User Status */}
+              <div id="userStatus" className="card">
+                <h2 className="card-header">2. Patient Status</h2>
+                <ul className="details-list">
+                  <li><strong>Identity Integrity:</strong> <span id="identity-status" style={{ color: identityIntegrity === 'Good' ? 'green' : (identityIntegrity === 'Bad' ? 'red' : 'black') }}>{identityIntegrity}</span>
+                    <button className="btn btn-primary" onClick={() => checkIdentityIntegrity(true)}>Check</button>
+                  </li>
+                  <li><strong>Registration Status:</strong> <span style={{ color: registrationStatus === 'Registered' ? 'green' : 'red' }}>{registrationStatus}</span>
+                  </li>
+                  {/* <li><strong>Payment Status:</strong> <span style={{ color: paymentStatus === 'Paid' ? 'green' : 'red' }}>{paymentStatus}</span></li> */}
+                  <li><strong>Patient Status:</strong> <span style={{ color: patientStatus === 'Checked In' ? 'green' : 'red' }}>{patientStatus}</span></li>
+                </ul>
+              </div>
+
+              {/* User Profile Section (Full-width) */}
+              <div id="userDetails" className="card" ref={userProfileRef}>
+                <h2 className="card-header">3. Patient Personal Details</h2>
+                <form id="user-form" className="user-profile-form p-3">
+                  <div className="row" style={{ margin: "0px" }}>
+                    {formFields.map(field => (
+                      <div className="col-md-6" key={field.name}>
+                        <div className="form-group">
+                          <label htmlFor={field.name}>{field.label}</label>
+                          <div className="input-with-status">
+                            {field.type === 'select' ? (
+                              <select id={field.name} name={field.name} className={`form-control ${kycMatchResponse && (kycMatchResponse[`${field.name}Match`] === 'false' || kycMatchResponse[`${field.name}Match`] === 'not_available') ? 'input-match-error' : kycMatchResponse && kycMatchResponse[`${field.name}Match`] === 'true' ? 'input-match-success' : ''}`} value={formState[field.name]} onChange={handleInputChange}>
+                                {field.options.map(option => (
+                                  <option key={option} value={option} >{option}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type={field.type}
+                                id={field.name}
+                                name={field.name}
+                                className={`form-control ${kycMatchResponse && (kycMatchResponse[`${field.name}Match`] === 'false' || kycMatchResponse[`${field.name}Match`] === 'not_available') ? 'input-match-error' : kycMatchResponse && kycMatchResponse[`${field.name}Match`] === 'true' ? 'input-match-success' : ''}`}
+                                value={formState[field.name]}
+                                onChange={handleInputChange}
+                              />
+                            )}
+                            {kycMatchResponse && renderMatchStatus(kycMatchResponse[`${field.name}Match`], field.name)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="btn-container">
+                    <button type="button" id="submitKycBtn" className="btn btn-primary" onClick={submitKyc}>KYC Match</button>
+                  </div>
+                </form>
+              </div>
+                </div>
+
+                <div style={{ flex: 1, minWidth: '300px' }}>
+                  {/* Medical Details */}
+                  <div id="medicalDetails" className="card">
+                    <h2 className="card-header">4. Patient Medical Details</h2>
+                    <ul className="details-list">
+                      <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
+                      <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
+                      <li><strong>Chief Complaint:</strong> <span>{patientMedicalDetails.complaint}</span></li>
+                      <li><strong>Estimated time of arrival (duration until arrival):</strong> <span>{patientMedicalDetails.eta}</span></li>
+                    </ul>
+                  </div>
+
+                  {/* Outpatient Monitoring */}
+                  <div id="outpatientMonitoring" className="card">
+                    <h2 className="card-header">5. Outpatient Monitoring</h2>
+                    <ul className="details-list">
+                      <li><strong>Status:</strong> <span style={{ color: outpatientStatus.includes('Anomaly') ? 'red' : (outpatientStatus === 'Inactive' ? 'black' : 'green') }}>{outpatientStatus}</span></li>
+                    </ul>
+                    <div className="p-3">
+                        <button className="btn btn-primary" onClick={handleOutpatientSequence}>Start Monitoring</button>
+                    </div>
+                  </div>
+
+                  {/* Location Tracker */}
+                  <div id="locationTracker" className="card">
+                    <h2 className="card-header">6. Location Tracker</h2>
+                    <LocationMap userGps={userGps} hospitalLocation={hospitalLocation} verifiedPhoneNumber={verifiedPhoneNumber} simulationMode={simulationMode} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            )}
+
+            {/* SCREEN 3: All Details */}
+            {activeScreen === 3 && (
+            <>
+              <div className="dashboard-column" style={{ flex: 1, minWidth: 0 }}>
+                {/* Phone Verification */}
+                <div id="verification-container" className="card">
+                  <h2 className="card-header">1. Phone Verification</h2>
+                  <div className="p-3">
+                    {/* Authentication Section */}
+                    <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa' }}>
+                      <h5>Authentication Required</h5>
+                      <p>Before using number verification, you need to authenticate with the OAuth2 flow.</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button 
+                          className={`btn ${isAuthenticated ? 'btn-success' : 'btn-warning'}`} 
+                          onClick={handleAuthentication}
+                          disabled={isAuthenticating || !getVerifiedNumber()}
+                        >
+                          {isAuthenticating ? 'Authenticating...' : isAuthenticated ? 'Authenticated ✓' : 'Authenticate'}
+                        </button>
+                        <span style={{ color: isAuthenticated ? 'green' : 'orange' }}>
+                          {isAuthenticated ? 'Ready to use APIs' : 'Authentication required'}
+                        </span>
+                      </div>
+                      {authError && <div className="alert alert-danger" style={{ marginTop: '10px' }}>{authError}</div>}
+                      {!getVerifiedNumber() && <div className="alert alert-info" style={{ marginTop: '10px' }}>Enter a phone number first</div>}
+                    </div>
+                    
+                    <form onSubmit={validatePhone}>
+                      <div className="verify-form-container">
+                        <div className="form-group">
+                          <input type="text" id="phone" className="form-control" placeholder="e.g., +61412345678" value={phone} onChange={handlePhoneChange} />
+                        </div>
+                        <button type="submit" id="verifyBtn" className="btn btn-primary" disabled={!isAuthenticated}>Verify</button>
+                      </div>
+                      {error && <div id="error" className="alert alert-danger">{error}</div>}
+                      {success && <div id="success" className="alert alert-success">{success}</div>}
+                      {!verifiedPhoneNumber && !error && <div className="alert alert-info">Please authenticate and verify the phone number.</div>}
+                    </form>
+                  </div>
+                </div>
+
+                {/* User Status */}
+                <div id="userStatus" className="card">
+                  <h2 className="card-header">2. Patient Status</h2>
+                  <ul className="details-list">
+                    <li><strong>Identity Integrity:</strong> <span id="identity-status" style={{ color: identityIntegrity === 'Good' ? 'green' : (identityIntegrity === 'Bad' ? 'red' : 'black') }}>{identityIntegrity}</span>
+                      <button className="btn btn-primary" onClick={() => checkIdentityIntegrity(true)}>Check</button>
+                    </li>
+                    <li><strong>Registration Status:</strong> <span style={{ color: registrationStatus === 'Registered' ? 'green' : 'red' }}>{registrationStatus}</span>
+                    </li>
+                    {/* <li><strong>Payment Status:</strong> <span style={{ color: paymentStatus === 'Paid' ? 'green' : 'red' }}>{paymentStatus}</span></li> */}
+                    <li><strong>Patient Status:</strong> <span style={{ color: patientStatus === 'Checked In' ? 'green' : 'red' }}>{patientStatus}</span></li>
+                  </ul>
+                </div>
+
+                {/* User Profile Section (Full-width) */}
+                <div id="userDetails" className="card" ref={userProfileRef}>
+                  <h2 className="card-header">3. Patient Personal Details</h2>
+                  <form id="user-form" className="user-profile-form p-3">
+                    <div className="row" style={{ margin: "0px" }}>
+                      {formFields.map(field => (
+                        <div className="col-md-6" key={field.name}>
+                          <div className="form-group">
+                            <label htmlFor={field.name}>{field.label}</label>
+                            <div className="input-with-status">
+                              {field.type === 'select' ? (
+                                <select id={field.name} name={field.name} className={`form-control ${kycMatchResponse && (kycMatchResponse[`${field.name}Match`] === 'false' || kycMatchResponse[`${field.name}Match`] === 'not_available') ? 'input-match-error' : kycMatchResponse && kycMatchResponse[`${field.name}Match`] === 'true' ? 'input-match-success' : ''}`} value={formState[field.name]} onChange={handleInputChange}>
+                                  {field.options.map(option => (
+                                    <option key={option} value={option} >{option}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type={field.type}
+                                  id={field.name}
+                                  name={field.name}
+                                  className={`form-control ${kycMatchResponse && (kycMatchResponse[`${field.name}Match`] === 'false' || kycMatchResponse[`${field.name}Match`] === 'not_available') ? 'input-match-error' : kycMatchResponse && kycMatchResponse[`${field.name}Match`] === 'true' ? 'input-match-success' : ''}`}
+                                  value={formState[field.name]}
+                                  onChange={handleInputChange}
+                                />
+                              )}
+                              {kycMatchResponse && renderMatchStatus(kycMatchResponse[`${field.name}Match`], field.name)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="btn-container">
+                      <button type="button" id="submitKycBtn" className="btn btn-primary" onClick={submitKyc}>KYC Match</button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Medical Details */}
+                <div id="medicalDetails" className="card">
+                  <h2 className="card-header">4. Patient Medical Details</h2>
+                  <ul className="details-list">
+                    <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
+                    <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
+                    <li><strong>Chief Complaint:</strong> <span>{patientMedicalDetails.complaint}</span></li>
+                    <li><strong>Estimated time of arrival (duration until arrival):</strong> <span>{patientMedicalDetails.eta}</span></li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="dashboard-column" style={{ flex: 1, minWidth: 0 }}>
+                {/* API Actions */}
+                <div id="apiActions" className="card">
+                  <h2 className="card-header">5. Automated Sequences</h2>
+                  <div className="p-3">
+                    <div className="api-buttons">
+                      <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
+                      {patientStatus !== 'Checked In' && (
+                        <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Medical Details Entry and Transport</button>
+                      )}
+                      {patientStatus === 'Checked In' && <>
+                        <button className="btn btn-primary" onClick={() => handlePatientSequence('departure')}>Patient Abscondment</button>
+                      </>}
+                    </div>
+                    <div id="response-container" className="log-container" style={{ height: '200px', overflowY: 'auto', background: 'black', border: '1px solid #dee2e6', padding: '10px', marginTop: '10px' }}>
+                      <pre id="api-response" style={{ whiteSpace: 'pre-wrap', margin: 0, color: 'white' }}>{messages.join('\n')}</pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* API Logs in Tab 3 */}
+                <ApiLogsView apiLogs={apiLogs} onClear={() => setApiLogs([])} maxHeight="400px" />
+
+                {/* Outpatient Monitoring */}
+                <div id="outpatientMonitoring" className="card">
+                  <h2 className="card-header">6. Outpatient Monitoring</h2>
+                  <ul className="details-list">
+                    <li><strong>Status:</strong> <span style={{ color: outpatientStatus.includes('Anomaly') ? 'red' : (outpatientStatus === 'Inactive' ? 'black' : 'green') }}>{outpatientStatus}</span></li>
+                  </ul>
+                  <div className="p-3">
+                      <button className="btn btn-primary" onClick={handleOutpatientSequence}>Start Monitoring</button>
+                  </div>
+                </div>
+
+                {/* Location Tracker */}
+                <div id="locationTracker" className="card">
+                  <h2 className="card-header">7. Location Tracker</h2>
+                  <LocationMap userGps={userGps} hospitalLocation={hospitalLocation} verifiedPhoneNumber={verifiedPhoneNumber} simulationMode={simulationMode} />
+                </div>
+              </div>
+            </>
+            )}
+          </div>
+
+
+        </div>
+      </main>
+
+      <footer className="footer">
+        &copy; 2026 MWC Event
+      </footer>
+    </div>
+  );
+}
+export default App;

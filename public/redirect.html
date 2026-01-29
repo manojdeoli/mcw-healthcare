@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Redirect</title>
+</head>
+<body>
+    <div style="text-align: center; padding: 50px;">
+        <h2>Processing authentication...</h2>
+        <p>Please wait while we complete the authentication process.</p>
+    </div>
+
+    <script>
+        // Extract code from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+
+        if (code) {
+            // Send code back to parent window
+            window.opener.postMessage({
+                type: 'AUTH_CODE',
+                code: code
+            }, window.location.origin);
+        } else if (error) {
+            // Send error back to parent window
+            window.opener.postMessage({
+                type: 'AUTH_ERROR',
+                error: error
+            }, window.location.origin);
+        } else {
+            // No code or error found
+            window.opener.postMessage({
+                type: 'AUTH_ERROR',
+                error: 'No authorization code received'
+            }, window.location.origin);
+        }
+
+        // Close the popup
+        window.close();
+    </script>
+</body>
+</html>
