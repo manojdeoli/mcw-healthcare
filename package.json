@@ -21,15 +21,18 @@
     "concurrently": "^7.6.0"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "set WATCHPACK_POLLING=true && react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "concurrently \"node server.js\" \"npm start\"",
-    "start:prod": "NODE_ENV=production node server.js",
-    "deploy": "npm run build && npm run start:prod"
+    "server": "node server.js",
+    "dev": "concurrently \"npm run server\" \"npm start\"",
+    "start:prod": "set NODE_ENV=production && node server.js",
+    "deploy": "npm run build && npm run start:prod",
+    "clean": "taskkill /F /IM node.exe /T 2>nul || echo No node processes found",
+    "fresh": "npm run clean && timeout /t 2 /nobreak && npm run dev"
   },
-  "proxy": "http://localhost:3005",
+  "proxy": "http://localhost:3003",
   "eslintConfig": {
     "extends": [
       "react-app",

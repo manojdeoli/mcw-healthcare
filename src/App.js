@@ -171,7 +171,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
     }
   }, [userGps, verifiedPhoneNumber, hospitalLocation, isMapReady, simulationMode]);
 
-  return <div id="map" ref={mapRef} style={{ height: '530px', width: '100%' }}></div>;
+  return <div id="map" ref={mapRef} style={{ height: '350px', width: '100%' }}></div>;
 };
 
 const ApiLogsView = ({ apiLogs, onClear, maxHeight }) => (
@@ -208,6 +208,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [tokenExpirySeconds, setTokenExpirySeconds] = useState(null);
   const [activeScreen, setActiveScreen] = useState(1);
   const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState(() => {
     const stored = localStorage.getItem('verifiedPhoneNumber');
@@ -243,7 +244,11 @@ function App() {
   useEffect(() => {
     console.log('🚀 App mounted, checking for auth callback...');
     
-    // Check if returning from OAuth redirect
+    const step3Url = localStorage.getItem('auth_url_step3');
+    if (step3Url) {
+      console.log('📝 Step 3 Authorization URL (from previous session):', step3Url);
+    }
+    
     const checkAuth = async () => {
       const authResult = await authService.checkAndHandleCallback();
       
@@ -254,24 +259,53 @@ function App() {
           setIsAuthenticated(true);
           setVerifiedPhoneNumber(authResult.phoneNumber);
           localStorage.setItem('verifiedPhoneNumber', authResult.phoneNumber);
+          localStorage.removeItem('auth_url_step3');
+          localStorage.setItem('has_authenticated', 'true');
           broadcast('SET_VERIFIED_PHONE', authResult.phoneNumber);
-          addMessage('Authentication successful! You can now use number verification API.');
         } else if (authResult.error) {
           setAuthError(authResult.error);
-          addMessage(`Authentication failed: ${authResult.error}`);
         }
         return;
       }
       
-      // Check if we already have authentication state
       if (authService.isAuthenticated()) {
+        console.log('✅ Token still valid, restoring authentication state');
         setIsAuthenticated(true);
-        addMessage('Authentication restored from previous session.');
+        return;
+      }
+      
+      // Auto-authenticate only on first visit
+      const hasAuthenticated = localStorage.getItem('has_authenticated');
+      console.log('🔍 Checking has_authenticated flag:', hasAuthenticated);
+      if (!hasAuthenticated) {
+        console.log('🔐 First visit - triggering auto-authentication');
+        const phoneToUse = '+99999991000';
+        setPhone(phoneToUse);
+        setTimeout(async () => {
+          try {
+            await authService.authenticate(phoneToUse);
+          } catch (error) {
+            console.error('Auto-authentication failed:', error);
+          }
+        }, 100);
       }
     };
     
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const interval = setInterval(() => {
+        const seconds = authService.getTimeUntilExpiry();
+        setTokenExpirySeconds(seconds);
+        if (seconds === 0) {
+          setIsAuthenticated(false);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
 
   // --- Broadcast Channel for Cross-Tab Sync ---
   const channelRef = useRef(null);
@@ -550,23 +584,20 @@ function App() {
 
   // Authentication handler
   const handleAuthentication = async () => {
-    const phoneToUse = phone || getVerifiedNumber();
-    if (!phoneToUse) {
-      alert('Please enter a phone number first.');
-      return;
-    }
+    const phoneToUse = phone || getVerifiedNumber() || '+99999991000';
 
     setIsAuthenticating(true);
     setAuthError('');
+    if (!phone && !getVerifiedNumber()) {
+      setPhone(phoneToUse);
+    }
     
     try {
-      await authService.authenticate(phoneToUse, addMessage);
+      await authService.authenticate(phoneToUse);
       setIsAuthenticated(true);
-      addMessage('Authentication successful! You can now use number verification API.');
     } catch (error) {
       console.error('Authentication failed:', error);
       setAuthError(`Authentication failed: ${error.message}`);
-      addMessage(`Authentication failed: ${error.message}`);
     } finally {
       setIsAuthenticating(false);
     }
@@ -612,20 +643,22 @@ function App() {
   };
 
   const checkIdentityIntegrity = async (loader) => {
-    const phone = getVerifiedNumber();
-    if (!phone) {
-      alert('Please verify phone number first.');
+    // TODO: Temporarily using phone from text box for testing since Nokia doesn't provide a number with all APIs working
+    // In production, should use: const phoneToCheck = getVerifiedNumber();
+    const phoneToCheck = phone || getVerifiedNumber();
+    if (!phoneToCheck) {
+      alert('Please enter or verify phone number first.');
       return false;
     }
     setIsLoading(loader);
     setIdentityIntegrity('Checking...');
     try {
-      const simSwapReq = { phoneNumber: phone, maxAge: 240 };
-      const simSwapResult = await api.simSwap(phone); // api.simSwap arg is phone, but internally it mocks the req.
+      const simSwapReq = { phoneNumber: phoneToCheck, maxAge: 240 };
+      const simSwapResult = await api.simSwap(phoneToCheck);
       logApiInteraction('SIM Swap', 'POST', '/sim-swap/sim-swap/v0/check', simSwapReq, simSwapResult);
 
-      const deviceSwapReq = { phoneNumber: phone, maxAge: 240 };
-      const deviceSwapResult = await api.deviceSwap(phone);
+      const deviceSwapReq = { phoneNumber: phoneToCheck, maxAge: 240 };
+      const deviceSwapResult = await api.deviceSwap(phoneToCheck);
       logApiInteraction('Device Swap', 'POST', '/device-swap/device-swap/v1/check', deviceSwapReq, deviceSwapResult);
 
       const isSimSwapped = simSwapResult && simSwapResult.swapped === true;
@@ -635,7 +668,6 @@ function App() {
         syncSetIdentityIntegrity('Bad');
         addMessage(`Identity Integrity Check Failed. SIM: ${isSimSwapped}, Device: ${isDeviceSwapped}`);
       } else {
-        // Use artificial time if running, otherwise use current real time to ensure we have a baseline
         const checkTime = artificialTime ? new Date(artificialTime.getTime()) : new Date();
         syncSetLastIntegrityCheckTime(checkTime);
         syncSetIdentityIntegrity('Good');
@@ -827,7 +859,7 @@ function App() {
 
       <nav className="screen-nav" style={{ background: '#f0f0f0', padding: '10px', textAlign: 'center', marginBottom: '20px' }}>
         <button className={`btn ${activeScreen === 1 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(1)}>1. API Interactions</button>
-        <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(2)}>2. Patient Dashboard</button>
+        <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(2)}>2. Hospital Dashboard</button>
         <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>3. All Details</button>
       </nav>
 
@@ -872,23 +904,30 @@ function App() {
                 <h2 className="card-header">1. Phone Verification</h2>
                 <div className="p-3">
                   {/* Authentication Section */}
-                  <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa' }}>
-                    <h5>Authentication Required</h5>
-                    <p>Before using number verification, you need to authenticate with the OAuth2 flow.</p>
+                  <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: isAuthenticated ? '#d4edda' : '#f8f9fa', fontSize: '0.9em' }}>
+                    <h5 style={{ fontSize: '1em', marginBottom: '10px' }}>Authentication Status</h5>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <button 
-                        className={`btn ${isAuthenticated ? 'btn-success' : 'btn-warning'}`} 
+                        className={`btn ${(isAuthenticated && tokenExpirySeconds > 0) ? 'btn-success' : 'btn-warning'}`} 
                         onClick={handleAuthentication}
-                        disabled={isAuthenticating || (!phone && !getVerifiedNumber())}
+                        disabled={isAuthenticating}
+                        style={{ fontSize: '0.85em', padding: '6px 12px' }}
                       >
-                        {isAuthenticating ? 'Authenticating...' : isAuthenticated ? 'Authenticated ✓' : 'Authenticate'}
+                        {isAuthenticating ? 'Authenticating...' : (isAuthenticated && tokenExpirySeconds > 0) ? 'Authenticated ✓' : 'Authenticate'}
                       </button>
-                      <span style={{ color: isAuthenticated ? 'green' : 'orange' }}>
-                        {isAuthenticated ? 'Ready to use APIs' : 'Authentication required'}
+                      <span style={{ color: (isAuthenticated && tokenExpirySeconds > 0) ? 'green' : 'orange', fontWeight: 'bold', fontSize: '0.9em' }}>
+                        {(isAuthenticated && tokenExpirySeconds > 0) ? 'Ready to use APIs' : 'Click to authenticate'}
                       </span>
                     </div>
-                    {authError && <div className="alert alert-danger" style={{ marginTop: '10px' }}>{authError}</div>}
-                    {!phone && !getVerifiedNumber() && <div className="alert alert-info" style={{ marginTop: '10px' }}>Enter a phone number first</div>}
+                    {isAuthenticated && tokenExpirySeconds !== null && (
+                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: tokenExpirySeconds < 60 ? '#fff3cd' : '#d1ecf1', borderRadius: '5px', fontSize: '0.85em' }}>
+                        <strong style={{ color: tokenExpirySeconds < 60 ? '#856404' : '#0c5460' }}>
+                          Re-authentication required in: {tokenExpirySeconds} seconds
+                          {tokenExpirySeconds < 60 && ' - Please click Authenticate button!'}
+                        </strong>
+                      </div>
+                    )}
+                    {authError && <div className="alert alert-danger" style={{ marginTop: '10px', fontSize: '0.85em' }}>{authError}</div>}
                   </div>
                   
                   <form onSubmit={validatePhone}>
@@ -1000,23 +1039,30 @@ function App() {
                   <h2 className="card-header">1. Phone Verification</h2>
                   <div className="p-3">
                     {/* Authentication Section */}
-                    <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa' }}>
-                      <h5>Authentication Required</h5>
-                      <p>Before using number verification, you need to authenticate with the OAuth2 flow.</p>
+                    <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa', fontSize: '0.9em' }}>
+                      <h5 style={{ fontSize: '1em', marginBottom: '10px' }}>Authentication</h5>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <button 
-                          className={`btn ${isAuthenticated ? 'btn-success' : 'btn-warning'}`} 
+                          className={`btn ${(isAuthenticated && tokenExpirySeconds > 0) ? 'btn-success' : 'btn-warning'}`} 
                           onClick={handleAuthentication}
-                          disabled={isAuthenticating || !getVerifiedNumber()}
+                          disabled={isAuthenticating}
+                          style={{ fontSize: '0.85em', padding: '6px 12px' }}
                         >
-                          {isAuthenticating ? 'Authenticating...' : isAuthenticated ? 'Authenticated ✓' : 'Authenticate'}
+                          {isAuthenticating ? 'Authenticating...' : (isAuthenticated && tokenExpirySeconds > 0) ? 'Authenticated ✓' : 'Authenticate'}
                         </button>
-                        <span style={{ color: isAuthenticated ? 'green' : 'orange' }}>
-                          {isAuthenticated ? 'Ready to use APIs' : 'Authentication required'}
+                        <span style={{ color: (isAuthenticated && tokenExpirySeconds > 0) ? 'green' : 'orange', fontSize: '0.9em' }}>
+                          {(isAuthenticated && tokenExpirySeconds > 0) ? 'Ready to use APIs' : 'Authentication required'}
                         </span>
                       </div>
-                      {authError && <div className="alert alert-danger" style={{ marginTop: '10px' }}>{authError}</div>}
-                      {!getVerifiedNumber() && <div className="alert alert-info" style={{ marginTop: '10px' }}>Enter a phone number first</div>}
+                      {isAuthenticated && tokenExpirySeconds !== null && (
+                        <div style={{ marginTop: '10px', padding: '8px', backgroundColor: tokenExpirySeconds < 60 ? '#fff3cd' : '#d1ecf1', borderRadius: '5px', fontSize: '0.85em' }}>
+                          <strong style={{ color: tokenExpirySeconds < 60 ? '#856404' : '#0c5460' }}>
+                            Re-authentication required in: {tokenExpirySeconds} seconds
+                            {tokenExpirySeconds < 60 && ' - Please click Authenticate button!'}
+                          </strong>
+                        </div>
+                      )}
+                      {authError && <div className="alert alert-danger" style={{ marginTop: '10px', fontSize: '0.85em' }}>{authError}</div>}
                     </div>
                     
                     <form onSubmit={validatePhone}>

@@ -75,8 +75,13 @@ app.get('/redirect', (req, res) => {
 app.post('/api/token-exchange', async (req, res) => {
   try {
     console.log('🔄 Backend: Proxying token exchange to Nokia...');
+    console.log('📥 Request body:', JSON.stringify(req.body, null, 2));
     
     const { tokenEndpoint, authHeader, body } = req.body;
+    
+    console.log('🔗 Token endpoint:', tokenEndpoint);
+    console.log('🔑 Auth header:', authHeader);
+    console.log('📤 Body:', body);
     
     const response = await fetch(tokenEndpoint, {
       method: 'POST',
@@ -96,6 +101,7 @@ app.post('/api/token-exchange', async (req, res) => {
     if (response.ok) {
       res.json(JSON.parse(responseText));
     } else {
+      console.error('❌ Nokia error response:', responseText);
       res.status(response.status).json({ error: responseText });
     }
   } catch (error) {
@@ -112,11 +118,11 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   if (process.env.NODE_ENV !== 'production') {
     console.log('📱 React app: http://localhost:3000');
-    console.log('🔧 API server: http://localhost:3005');
+    console.log('🔧 API server: http://localhost:3003');
   }
 });

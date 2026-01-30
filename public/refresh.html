@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Refreshing...</title>
+</head>
+<body>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        if (code && window.opener) {
+            window.opener.postMessage({ type: 'TOKEN_REFRESH', code }, window.location.origin);
+            window.close();
+        }
+    </script>
+</body>
+</html>

@@ -1,42 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Authentication Redirect</title>
+    <title>Authentication Callback</title>
 </head>
 <body>
-    <div style="text-align: center; padding: 50px;">
-        <h2>Processing authentication...</h2>
-        <p>Please wait while we complete the authentication process.</p>
-    </div>
-
+    <h3>Processing authentication...</h3>
+    <p>Please wait while we complete the authentication process.</p>
     <script>
-        // Extract code from URL parameters
+        // Get the code from URL immediately
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
-        const error = urlParams.get('error');
-
+        
         if (code) {
-            // Send code back to parent window
-            window.opener.postMessage({
-                type: 'AUTH_CODE',
-                code: code
-            }, window.location.origin);
-        } else if (error) {
-            // Send error back to parent window
-            window.opener.postMessage({
-                type: 'AUTH_ERROR',
-                error: error
-            }, window.location.origin);
+            console.log('Code received on redirect page:', code);
+            // Redirect to main app with code in URL
+            window.location.href = '/?code=' + code;
         } else {
-            // No code or error found
-            window.opener.postMessage({
-                type: 'AUTH_ERROR',
-                error: 'No authorization code received'
-            }, window.location.origin);
+            console.error('No code in redirect URL');
+            window.location.href = '/';
         }
-
-        // Close the popup
-        window.close();
     </script>
 </body>
 </html>
