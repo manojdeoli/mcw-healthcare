@@ -511,7 +511,7 @@ function App() {
       name: kycData.name
     };
     const kycMatchData = await api.kycMatch(kycReq);
-    logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', kycReq, kycMatchData);
+    logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', api.obscureKycRequest(kycReq), kycMatchData);
 
     syncSetKycMatchResponse(kycMatchData);
 
@@ -545,7 +545,7 @@ function App() {
         name: formState.name
       };
       const kycData = await api.kycMatch(kycReq);
-      logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', kycReq, kycData);
+      logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', api.obscureKycRequest(kycReq), kycData);
 
       syncSetKycMatchResponse(kycData);
 

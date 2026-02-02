@@ -253,6 +253,16 @@ export async function kycFill(phoneNumber) {
     };
 }
 
+export function obscureKycRequest(data) {
+    return {
+        phoneNumber: data.phoneNumber,
+        name: data.name ? 'XXXXX' : '',
+        address: data.address ? 'XXXXX' : '',
+        email: data.email ? 'XXXXX' : '',
+        birthdate: data.birthdate ? 'XXXXX' : ''
+    };
+}
+
 export function locationRetrieval(phoneNumber, mockCoordinates) {
     return post('https://network-as-code.p-eu.rapidapi.com/location-retrieval/v0/retrieve', {
         device: {
