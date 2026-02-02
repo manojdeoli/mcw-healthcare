@@ -498,34 +498,7 @@ function App() {
     logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData._obscured);
     
     syncSetFormState(kycData);
-
-    // 3. Wait and call KYC Match
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    addMessage("Calling KYC Match...");
-    
-    const kycReq = {
-      phoneNumber: phone,
-      email: kycData.email,
-      address: kycData.address,
-      birthdate: kycData.birthdate,
-      name: kycData.name
-    };
-    const kycMatchData = await api.kycMatch(kycReq);
-    logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', api.obscureKycRequest(kycReq), kycMatchData);
-
-    syncSetKycMatchResponse(kycMatchData);
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const allFieldsMatch = !Object.values(kycMatchData).includes('false');
-    if (allFieldsMatch) {
-      addMessage('KYC Match successful. Proceed with check-in.');
-      syncSetRegistrationStatus('Registered');
-    } else {
-      syncSetRegistrationStatus('Not Registered'); // Explicitly ensure status is not registered
-      addMessage('KYC Match failed for some fields. Please correct and re-submit.');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      userProfileRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    addMessage("Form populated. Please review and click 'KYC Match' to verify.");
   };
 
   const submitKyc = async () => {
