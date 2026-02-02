@@ -232,21 +232,16 @@ const defaultKycData = {
     birthdate: '1958-08-29'
 };
 
-export function kycFill(phoneNumber) {
-    return post(`${API_BASE_URL}/kyc-fill-in/kyc-fill-in/v0.4/fill-in`, { phoneNumber });
-    /* return new Promise(resolve => {
-        setTimeout(() => {
-            const phone = phoneNumber ? phoneNumber.replace('+', '') : '';
-            const userData = mockKycData[phone]; // Attempt to find user data
-
-            if (userData) {
-                resolve(userData);
-            } else {
-                // Fallback to default data if no match
-                resolve(defaultKycData);
-            }
-        }, 1000); // Simulate network delay
-    }); */
+export async function kycFill(phoneNumber) {
+    const response = await post(`${API_BASE_URL}/kyc-fill-in/kyc-fill-in/v0.4/fill-in`, { phoneNumber });
+    return {
+        phoneNumber: response.phoneNumber,
+        idDocument: response.idDocument,
+        name: response.name || '',
+        address: response.address || '',
+        email: response.email || '',
+        birthdate: response.birthdate || ''
+    };
 }
 
 export function locationRetrieval(phoneNumber, mockCoordinates) {
