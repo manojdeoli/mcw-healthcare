@@ -58,14 +58,23 @@ async function ensureValidToken() {
 }
 
 export function kycMatch(data) {
-    // return post(`${API_BASE_URL}/kyc-match/kyc-match/v0.2/match`, data);
     return new Promise(resolve => {
         setTimeout(() => {
+            const stored = storedKycFillData[data.phoneNumber];
+            if (!stored) {
+                resolve({
+                    nameMatch: 'not_available',
+                    addressMatch: 'not_available',
+                    birthdateMatch: 'not_available',
+                    emailMatch: 'not_available'
+                });
+                return;
+            }
             resolve({
-                nameMatch: 'true',
-                addressMatch: 'true',
-                birthdateMatch: 'true',
-                emailMatch: 'true'
+                nameMatch: data.name === stored.name ? 'true' : 'false',
+                addressMatch: data.address === stored.address ? 'true' : 'false',
+                birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false',
+                emailMatch: data.email === stored.email ? 'true' : 'false'
             });
         }, 500);
     });
@@ -232,9 +241,12 @@ const defaultKycData = {
     birthdate: '1958-08-29'
 };
 
+// Store KYC Fill data for validation
+let storedKycFillData = {};
+
 export async function kycFill(phoneNumber) {
     const response = await post(`${API_BASE_URL}/kyc-fill-in/kyc-fill-in/v0.4/fill-in`, { phoneNumber });
-    return {
+    const kycData = {
         phoneNumber: response.phoneNumber,
         idDocument: response.idDocument,
         name: response.name || '',
@@ -251,6 +263,8 @@ export async function kycFill(phoneNumber) {
             birthdate: response.birthdate ? 'XXXXX' : ''
         }
     };
+    storedKycFillData[phoneNumber] = kycData;
+    return kycData;
 }
 
 export function obscureKycRequest(data) {
