@@ -286,7 +286,7 @@ export function locationRetrieval(phoneNumber, mockCoordinates) {
         maxAge: 60
     });
     // This endpoint seems to be outside the CAMARA passthrough and requires its own headers
-    /* return axios.post('https://telstra-hackathon-apis.p-eu.rapidapi.com/location-retrieval/v0/retrieve', {
+    /* return axios.post('https://network-as-code.p-eu.rapidapi.com/location-retrieval/v0/retrieve', {
         device: {
             phoneNumber
         }
@@ -321,7 +321,7 @@ export function locationRetrieval(phoneNumber, mockCoordinates) {
 
 export function locationVerification(data, mockResult = "TRUE") {
     return post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data);
-    /* return axios.post('https://telstra-hackathon-apis.p-eu.rapidapi.com/location-verification/v1/verify', data, {
+    /* return axios.post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data, {
         headers: defaultHeaders
     }).then(response => response.data); */
     /*return new Promise(resolve => {
@@ -943,3 +943,4 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
     if (logApi) logApi('Delete Subscription', 'DELETE', `/device-reachability-status/v0/subscriptions/${subId}`, {}, { status: "deleted" });
     setOutpatientStatus("Monitoring Cycle Complete");
 }
+
