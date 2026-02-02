@@ -886,7 +886,7 @@ function App() {
                   <div className="api-buttons">
                     <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
                     {patientStatus !== 'Checked In' && (
-                      <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Medical Details Entry and Transport</button>
+                      <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Admit Patient & Monitor Transport</button>
                     )}
                     {patientStatus === 'Checked In' && <>
                       <button className="btn btn-primary" onClick={() => handlePatientSequence('departure')}>Patient Abscondment</button>
@@ -1187,7 +1187,7 @@ function App() {
                     <div className="api-buttons">
                       <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
                       {patientStatus !== 'Checked In' && (
-                        <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Medical Details Entry and Transport</button>
+                        <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Admit Patient & Monitor Transport</button>
                       )}
                       {patientStatus === 'Checked In' && <>
                         <button className="btn btn-primary" onClick={() => handlePatientSequence('departure')}>Patient Abscondment</button>
@@ -1234,3 +1234,4 @@ function App() {
   );
 }
 export default App;
+
