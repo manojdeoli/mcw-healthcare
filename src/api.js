@@ -346,14 +346,34 @@ export function carrierBilling(phoneNumber) {
 export async function startMedicalTransportSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, logApi) {
     addMessage("Starting Medical Transport sequence...");
 
+    // Generate patient ID
+    const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
+    addMessage(`Alert! Incoming patient (ID: ${patientId}). High-level symptoms: Chest pains and intermittent consciousness.`);
+
     await new Promise(resolve => setTimeout(resolve, 2000));
     addMessage("Populating patient medical details...");
     setPatientMedicalDetails({
+        patientId: patientId,
         esi: 'Level 2 (Emergency)',
         vitals: 'Pulse 120, blood pressure 160/110, oxygen saturation 93%, body temperature 39.0',
         complaint: 'Chest pain',
-        eta: 'Calculating...'
+        eta: 'Calculating...',
+        medicalHistory: '',
+        treatmentNeeds: { specialists: [], equipment: [] },
     });
+
+    // Fetch medical history after a few seconds
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    addMessage("Retrieving medical records from backend...");
+    setPatientMedicalDetails(prev => ({
+        ...prev,
+        medicalHistory: 'Hypertension (diagnosed 2018), Type 2 Diabetes (controlled), Previous MI (2020)',
+        treatmentNeeds: {
+            specialists: ['Cardiologist', 'Emergency Physician'],
+            equipment: ['Defibrillator', 'ECG', 'Cardiac Monitor', 'Oxygen Supply']
+        }
+    }));
+    addMessage("Medical history retrieved: Chronic conditions identified.");
 
     await new Promise(resolve => setTimeout(resolve, 2000));
     addMessage("Patient transport initiated.");
@@ -397,10 +417,10 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         let newVitals = null;
         if (i === 2) {
             newVitals = 'Pulse 115, blood pressure 155/105, oxygen saturation 94%, body temperature 38.8';
-            addMessage(`Updating patient vitals: ${newVitals}`);
+            addMessage(`Paramedic update: Patient vitals improving - ${newVitals}`);
         } else if (i === 4) {
             newVitals = 'Pulse 110, blood pressure 150/100, oxygen saturation 96%, body temperature 38.5';
-            addMessage(`Updating patient vitals: ${newVitals}`);
+            addMessage(`Paramedic update: Patient stabilizing - ${newVitals}`);
         }
 
         setPatientMedicalDetails(prev => ({ ...prev, eta: etaString, ...(newVitals ? { vitals: newVitals } : {}) }));
@@ -427,38 +447,17 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
 
     if (verification.verificationResult === "TRUE" || verification.verificationResult === true || (verification.matchRate && verification.matchRate > 80)) {
         addMessage("Location verification successful...");
-        addMessage("Welcome to CityCare Hospital Barcelona!");
-
-        setPatientStatus("Checked In");
-        addMessage("Patient check-in complete.");
-
-        addMessage("Creating Geofencing Subscription for patient monitoring...");
-        const geoSub = await createGeofencingSubscription(phoneNumber, hospitalLocation.lat, hospitalLocation.lng, 500);
-        if (logApi) logApi('Create Geofencing Subscription', 'POST', '/geofencing-subscriptions/v0.3/subscriptions', {
-            protocol: "HTTP",
-            sink: "https://notificationSendServer12.supertelco.com",
-            types: ["org.camaraproject.geofencing-subscriptions.v0.area-entered"],
-            config: {
-                subscriptionDetail: {
-                    device: { phoneNumber },
-                    area: {
-                        areaType: "CIRCLE",
-                        center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng },
-                        radius: 500
-                    }
-                },
-                initialEvent: true,
-                subscriptionMaxEvents: 10,
-                subscriptionExpireTime: "2026-03-20T05:40:58.469Z"
-            }
-        }, geoSub);
-        const subId = geoSub.id || geoSub.subscriptionId;
-        addMessage(`Geofencing Subscription Created: ID ${subId}`);
-
-        return subId;
+        addMessage("Patient has arrived at CityCare Hospital Barcelona!");
+        addMessage("Waiting for doctor to confirm check-in...");
+        
+        setPatientStatus("Awaiting Check-in");
+        
+        // Return verification status for manual check-in
+        return { verified: true, hospitalLocation };
 
     } else {
         addMessage("Location verification failed.");
+        return { verified: false };
     }
 }
 
@@ -469,10 +468,13 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     setUserGps(hospitalLocation);
 
     setPatientMedicalDetails({
+        patientId: '',
         esi: '',
         vitals: '',
         complaint: '',
         eta: '',
+        medicalHistory: '',
+        treatmentNeeds: { specialists: [], equipment: [] },
       });
     addMessage("Patient medical details cleared.");
     await new Promise(resolve => setTimeout(resolve, 2000));

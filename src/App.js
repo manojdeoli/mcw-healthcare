@@ -8,7 +8,7 @@ import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
 import { format } from 'date-fns';
 import * as api from './api';
 import authService from './auth';
-import { formFields } from './formFields';
+import { formFields, generatePatientId } from './formFields';
 import ambulanceIconPng from './ambulance.png';
 import patientIconPng from './patient.png';
 
@@ -231,10 +231,13 @@ function App() {
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
   const [patientMedicalDetails, setPatientMedicalDetails] = useState({
+    patientId: '',
     esi: '',
     vitals: '',
     complaint: '',
     eta: '',
+    medicalHistory: '',
+    treatmentNeeds: { specialists: [], equipment: [] },
   });
 
   const [messages, setMessages] = useState([]);
@@ -348,6 +351,9 @@ function App() {
         case 'SET_MEDICAL_DETAILS':
           setPatientMedicalDetails(data);
           break;
+        case 'SET_ADDITIONAL_PATIENTS':
+          setAdditionalPatients(data);
+          break;
         case 'ADD_MESSAGE':
           setMessages(prev => {
              if (prev.includes(data)) return prev;
@@ -390,6 +396,10 @@ function App() {
         broadcast('SET_MEDICAL_DETAILS', newData);
         return newData;
     });
+  };
+  const syncSetAdditionalPatients = (val) => {
+    setAdditionalPatients(val);
+    broadcast('SET_ADDITIONAL_PATIENTS', val);
   };
   const syncSetArtificialTime = (val) => { setArtificialTime(val); broadcast('SET_ARTIFICIAL_TIME', val); };
   const syncSetOutpatientStatus = (val) => { setOutpatientStatus(val); broadcast('SET_OUTPATIENT_STATUS', val); };
@@ -442,6 +452,7 @@ function App() {
   const [formState, setFormState] = useState(
     formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {})
   );
+  const [additionalPatients, setAdditionalPatients] = useState([]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -723,6 +734,14 @@ function App() {
       syncSetArtificialTime(startTime);
       setSimulationMode(mode);
       if (mode === 'arrival') {
+        // Mock additional patients in the system
+        syncSetAdditionalPatients([
+          { id: '847293561', name: 'Sarah Mitchell', symptoms: 'Moderate abdominal pain, nausea' },
+          { id: '923847102', name: 'James Rodriguez', symptoms: 'Minor laceration, stable' },
+          { id: '756482039', name: 'Emily Chen', symptoms: 'Fever, respiratory symptoms' },
+          { id: '681923745', name: 'Robert Thompson', symptoms: 'Ankle sprain, awaiting X-ray' }
+        ]);
+
         setIsLoading(true);
         // Fetch actual hotel location
         const hospitalLocationData = await api.locationRetrieval(phone);
@@ -789,11 +808,15 @@ function App() {
           syncSetInitialUserLocation(null);
           syncSetLastIntegrityCheckTime(null);
           syncSetPatientMedicalDetails({
+            patientId: '',
             esi: '',
             vitals: '',
             complaint: '',
             eta: '',
+            medicalHistory: '',
+            treatmentNeeds: { specialists: [], equipment: [] },
           });
+          syncSetAdditionalPatients([]);
           syncSetKycMatchResponse(null);
           syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
           syncSetArtificialTime(null);
@@ -1002,12 +1025,31 @@ function App() {
                   <div id="medicalDetails" className="card">
                     <h2 className="card-header">4. Patient Medical Details</h2>
                     <ul className="details-list">
+                      <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                       <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                       <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
                       <li><strong>Chief Complaint:</strong> <span>{patientMedicalDetails.complaint}</span></li>
                       <li><strong>Estimated time of arrival (duration until arrival):</strong> <span>{patientMedicalDetails.eta}</span></li>
+                      {patientMedicalDetails.medicalHistory && <li><strong>Medical History:</strong> <span>{patientMedicalDetails.medicalHistory}</span></li>}
+                      {patientMedicalDetails.treatmentNeeds.specialists.length > 0 && <li><strong>Specialists Required:</strong> <span>{patientMedicalDetails.treatmentNeeds.specialists.join(', ')}</span></li>}
+                      {patientMedicalDetails.treatmentNeeds.equipment.length > 0 && <li><strong>Equipment Needed:</strong> <span>{patientMedicalDetails.treatmentNeeds.equipment.join(', ')}</span></li>}
                     </ul>
                   </div>
+
+                  {/* Additional Patients */}
+                  {additionalPatients.length > 0 && (
+                  <div id="additionalPatients" className="card">
+                    <h2 className="card-header">Additional Patients</h2>
+                    <div className="p-3">
+                      {additionalPatients.map((patient, idx) => (
+                        <div key={idx} style={{ padding: '10px', marginBottom: '10px', border: '1px solid #ddd', borderRadius: '5px', background: '#f9f9f9' }}>
+                          <div><strong>{patient.name}</strong> (ID: {patient.id})</div>
+                          <div style={{ fontSize: '0.9em', color: '#666' }}>{patient.symptoms}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  )}
 
                   {/* Outpatient Monitoring */}
                   <div id="outpatientMonitoring" className="card">
@@ -1135,12 +1177,31 @@ function App() {
                 <div id="medicalDetails" className="card">
                   <h2 className="card-header">4. Patient Medical Details</h2>
                   <ul className="details-list">
+                    <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                     <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                     <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
                     <li><strong>Chief Complaint:</strong> <span>{patientMedicalDetails.complaint}</span></li>
                     <li><strong>Estimated time of arrival (duration until arrival):</strong> <span>{patientMedicalDetails.eta}</span></li>
+                    {patientMedicalDetails.medicalHistory && <li><strong>Medical History:</strong> <span>{patientMedicalDetails.medicalHistory}</span></li>}
+                    {patientMedicalDetails.treatmentNeeds.specialists.length > 0 && <li><strong>Specialists Required:</strong> <span>{patientMedicalDetails.treatmentNeeds.specialists.join(', ')}</span></li>}
+                    {patientMedicalDetails.treatmentNeeds.equipment.length > 0 && <li><strong>Equipment Needed:</strong> <span>{patientMedicalDetails.treatmentNeeds.equipment.join(', ')}</span></li>}
                   </ul>
                 </div>
+
+                {/* Additional Patients */}
+                {additionalPatients.length > 0 && (
+                <div id="additionalPatients" className="card">
+                  <h2 className="card-header">Additional Patients</h2>
+                  <div className="p-3">
+                    {additionalPatients.map((patient, idx) => (
+                      <div key={idx} style={{ padding: '10px', marginBottom: '10px', border: '1px solid #ddd', borderRadius: '5px', background: '#f9f9f9' }}>
+                        <div><strong>{patient.name}</strong> (ID: {patient.id})</div>
+                        <div style={{ fontSize: '0.9em', color: '#666' }}>{patient.symptoms}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                )}
               </div>
 
               <div className="dashboard-column" style={{ flex: 1, minWidth: 0 }}>
