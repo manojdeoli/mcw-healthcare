@@ -16,6 +16,25 @@ class AuthService {
         return secondsRemaining > 0 ? secondsRemaining : 0;
     }
 
+    isTokenValid() {
+        if (!this.accessToken || !this.tokenExpiresAt) return false;
+        const buffer = 30000; // 30 seconds buffer
+        return Date.now() < (this.tokenExpiresAt - buffer);
+    }
+
+    saveAppState(state) {
+        localStorage.setItem('app_state_backup', JSON.stringify(state));
+    }
+
+    restoreAppState() {
+        const saved = localStorage.getItem('app_state_backup');
+        if (saved) {
+            localStorage.removeItem('app_state_backup');
+            return JSON.parse(saved);
+        }
+        return null;
+    }
+
     async getClientCredentials() {
         console.log('🔑 Step 1: Getting client credentials...');
         const response = await fetch(`${BASE_URL}/oauth2/v1/auth/clientcredentials`, {
@@ -225,18 +244,8 @@ class AuthService {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         
-        // Check if we've already processed this code
-        const processedCode = sessionStorage.getItem('processed_code');
-        if (code && code === processedCode) {
-            console.log('⚠️ Code already processed, skipping');
-            return null;
-        }
-        
         if (code) {
             console.log('✅ Code found in URL:', code);
-            
-            // Mark this code as being processed
-            sessionStorage.setItem('processed_code', code);
             
             // Restore credentials and endpoints from sessionStorage
             const credStr = sessionStorage.getItem('auth_credentials');
@@ -256,21 +265,12 @@ class AuthService {
                     const tokenData = await this.exchangeCodeForToken(code, redirectUri);
                     
                     // Clear session storage
-                    sessionStorage.removeItem('auth_phone');
-                    sessionStorage.removeItem('auth_redirect_uri');
-                    sessionStorage.removeItem('auth_credentials');
-                    sessionStorage.removeItem('auth_endpoints');
-                    sessionStorage.removeItem('processed_code');
-                    sessionStorage.removeItem('auth_attempted');
+                    sessionStorage.clear();
                     
                     return { success: true, phoneNumber: authPhone, tokenData };
                 } catch (error) {
                     console.log('❌ Token exchange failed:', error);
-                    sessionStorage.removeItem('auth_phone');
-                    sessionStorage.removeItem('auth_redirect_uri');
-                    sessionStorage.removeItem('auth_credentials');
-                    sessionStorage.removeItem('auth_endpoints');
-                    sessionStorage.removeItem('processed_code');
+                    sessionStorage.clear();
                     return { error: error.message };
                 }
             }

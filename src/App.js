@@ -206,10 +206,13 @@ const ApiLogsView = ({ apiLogs, onClear, maxHeight }) => (
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authError, setAuthError] = useState('');
   const [tokenExpirySeconds, setTokenExpirySeconds] = useState(null);
-  const [activeScreen, setActiveScreen] = useState(1);
+  const [activeScreen, setActiveScreen] = useState(() => {
+    const saved = localStorage.getItem('activeScreen');
+    return saved ? parseInt(saved) : 1;
+  });
   const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState(() => {
     const stored = localStorage.getItem('verifiedPhoneNumber');
     return (stored && stored !== 'null' && stored !== 'undefined') ? stored : null;
@@ -265,6 +268,18 @@ function App() {
           localStorage.removeItem('auth_url_step3');
           localStorage.setItem('has_authenticated', 'true');
           broadcast('SET_VERIFIED_PHONE', authResult.phoneNumber);
+          
+          // Restore app state if available
+          const savedState = authService.restoreAppState();
+          if (savedState) {
+            console.log('✅ Restoring app state after re-authentication:', savedState);
+            if (savedState.activeScreen) {
+              setActiveScreen(parseInt(savedState.activeScreen));
+            }
+            if (savedState.outpatientStatus && savedState.outpatientStatus !== 'Inactive') {
+              syncSetOutpatientStatus(savedState.outpatientStatus);
+            }
+          }
         } else if (authResult.error) {
           setAuthError(authResult.error);
         }
@@ -274,6 +289,7 @@ function App() {
       if (authService.isAuthenticated()) {
         console.log('✅ Token still valid, restoring authentication state');
         setIsAuthenticated(true);
+        setIsAuthenticating(false);
         return;
       }
       
@@ -289,8 +305,11 @@ function App() {
             await authService.authenticate(phoneToUse);
           } catch (error) {
             console.error('Auto-authentication failed:', error);
+            setIsAuthenticating(false);
           }
         }, 100);
+      } else {
+        setIsAuthenticating(false);
       }
     };
     
@@ -338,6 +357,7 @@ function App() {
           break;
         case 'SET_OUTPATIENT_STATUS':
           setOutpatientStatus(data);
+          localStorage.setItem('outpatientStatus', data);
           break;
         case 'SET_HOSPITAL_LOCATION':
           setHospitalLocation(data);
@@ -402,7 +422,11 @@ function App() {
     broadcast('SET_ADDITIONAL_PATIENTS', val);
   };
   const syncSetArtificialTime = (val) => { setArtificialTime(val); broadcast('SET_ARTIFICIAL_TIME', val); };
-  const syncSetOutpatientStatus = (val) => { setOutpatientStatus(val); broadcast('SET_OUTPATIENT_STATUS', val); };
+  const syncSetOutpatientStatus = (val) => { 
+    setOutpatientStatus(val); 
+    localStorage.setItem('outpatientStatus', val);
+    broadcast('SET_OUTPATIENT_STATUS', val); 
+  };
   const syncSetIdentityIntegrity = (val) => { setIdentityIntegrity(val); broadcast('SET_IDENTITY_INTEGRITY', val); };
   const syncSetRegistrationStatus = (val) => { setRegistrationStatus(val); broadcast('SET_REGISTRATION_STATUS', val); };
   const syncSetHospitalLocation = (val) => { setHospitalLocation(val); broadcast('SET_HOSPITAL_LOCATION', val); };
@@ -490,12 +514,16 @@ function App() {
       alert('Please verify your phone number first to start registration.');
       return;
     }
+    
+    // Reset outpatient status when starting new registration
+    syncSetOutpatientStatus('Inactive');
+    
     addMessage("Starting Registration Sequence...");
 
     // 1. Use KYC Fill to partially populate
     addMessage("Partially populating form with KYC Fill...");
     const kycData = await api.kycFill(phone);
-    // Note: kycFill is internal logic, not strictly a network API in this demo, but we can log it if desired.
+    logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData);
     syncSetFormState(kycData);
 
     // 3. Wait and call KYC Match
@@ -597,6 +625,9 @@ function App() {
   const handleAuthentication = async () => {
     const phoneToUse = phone || getVerifiedNumber() || '+99999991000';
 
+    // Save current tab before authentication
+    localStorage.setItem('activeScreen', activeScreen.toString());
+
     setIsAuthenticating(true);
     setAuthError('');
     if (!phone && !getVerifiedNumber()) {
@@ -623,11 +654,6 @@ function App() {
 
     if (!regex.test(fullPhoneNumber)) {
       setError('Please enter a valid international phone number (e.g., +61412345678).');
-      return;
-    }
-
-    if (!isAuthenticated) {
-      setError('Please authenticate first before verifying phone number.');
       return;
     }
 
@@ -709,6 +735,21 @@ function App() {
     return (
       <div className="status-text-error">{text}</div>
     );
+  };
+
+  const handleCompleteCheckIn = async () => {
+    const phone = getVerifiedNumber();
+    if (!phone || !hospitalLocation) {
+      alert('Missing required data for check-in.');
+      return;
+    }
+    try {
+      const subId = await api.completeCheckIn(phone, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction);
+      if (subId) syncSetGeofencingSubscriptionId(subId);
+    } catch (error) {
+      console.error('Check-in completion failed:', error);
+      addMessage(`Error completing check-in: ${error.message}`);
+    }
   };
 
   const handlePatientSequence = async (mode) => {
@@ -803,6 +844,7 @@ function App() {
           syncSetPaymentStatus('Not Paid');
           syncSetGeofencingSubscriptionId(null);
           syncSetOutpatientStatus('Inactive');
+          localStorage.removeItem('outpatientStatus');
           syncSetHospitalLocation(null);
           syncSetUserGps(null);
           syncSetInitialUserLocation(null);
@@ -820,10 +862,6 @@ function App() {
           syncSetKycMatchResponse(null);
           syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
           syncSetArtificialTime(null);
-          setVerifiedPhoneNumber(null);
-          localStorage.removeItem('verifiedPhoneNumber');
-          broadcast('SET_VERIFIED_PHONE', null);
-          setPhone('');
           setSuccess('');
           setSimulationMode('arrival');
         }, 15000);
@@ -843,9 +881,15 @@ function App() {
       return;
     }
     
+    // Save current screen before any API calls that might trigger re-authentication
+    localStorage.setItem('activeScreen', activeScreen.toString());
+    
+    const patientName = formState.name || 'Patient';
+    const monitoringStatus = `Starting Monitoring for ${patientName}...`;
+    syncSetOutpatientStatus(monitoringStatus);
+    localStorage.setItem('outpatientStatus', monitoringStatus);
     syncSetArtificialTime(new Date());
     setIsSequenceRunning(true);
-    syncSetOutpatientStatus("Initializing...");
     
     try {
         let startLoc = initialUserLocation;
@@ -867,7 +911,7 @@ function App() {
 
   return (
     <div className="App">
-      {isLoading &&
+      {(isLoading || isAuthenticating) &&
         <div className="loader-overlay">
           <div className="d-flex justify-content-center align-items-center h-100">
             <div className="spinner-border text-light" style={{ width: '3rem', height: '3rem' }} role="status">
@@ -876,6 +920,8 @@ function App() {
           </div>
         </div>
       }
+      {!isAuthenticating && (
+      <>
       <header className="header">
         <h1><a href="/" className="header-link">Healthcare Use Case Demo</a></h1>
       </header>
@@ -910,7 +956,10 @@ function App() {
                 <div className="p-3">
                   <div className="api-buttons">
                     <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
-                    {patientStatus !== 'Checked In' && (
+                    {patientStatus === 'Awaiting Check-in' && (
+                      <button className="btn btn-success" onClick={handleCompleteCheckIn}>Complete Check-in</button>
+                    )}
+                    {patientStatus !== 'Checked In' && patientStatus !== 'Awaiting Check-in' && (
                       <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Medical Details Entry and Transport</button>
                     )}
                     {patientStatus === 'Checked In' && <>
@@ -926,8 +975,8 @@ function App() {
               <div id="verification-container" className="card">
                 <h2 className="card-header">1. Phone Verification</h2>
                 <div className="p-3">
-                  {/* Authentication Section */}
-                  <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: isAuthenticated ? '#d4edda' : '#f8f9fa', fontSize: '0.9em' }}>
+                  {/* Authentication Section - Hidden */}
+                  <div className="auth-section" style={{ display: 'none', marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: isAuthenticated ? '#d4edda' : '#f8f9fa', fontSize: '0.9em' }}>
                     <h5 style={{ fontSize: '1em', marginBottom: '10px' }}>Authentication Status</h5>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <button 
@@ -958,7 +1007,7 @@ function App() {
                       <div className="form-group">
                         <input type="text" id="phone" className="form-control" placeholder="e.g., +61412345678" value={phone} onChange={handlePhoneChange} />
                       </div>
-                      <button type="submit" id="verifyBtn" className="btn btn-primary" disabled={!isAuthenticated}>Verify</button>
+                      <button type="submit" id="verifyBtn" className="btn btn-primary">Verify</button>
                     </div>
                     {error && <div id="error" className="alert alert-danger">{error}</div>}
                     {success && <div id="success" className="alert alert-success">{success}</div>}
@@ -1025,6 +1074,7 @@ function App() {
                   <div id="medicalDetails" className="card">
                     <h2 className="card-header">4. Patient Medical Details</h2>
                     <ul className="details-list">
+                      {patientMedicalDetails.alert && <li style={{ backgroundColor: '#fff3cd', padding: '4px 6px', borderRadius: '2px', marginBottom: '4px', fontSize: '0.8em', color: '#856404' }}><strong>⚠️</strong> {patientMedicalDetails.alert}</li>}
                       <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                       <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                       <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
@@ -1080,8 +1130,8 @@ function App() {
                 <div id="verification-container" className="card">
                   <h2 className="card-header">1. Phone Verification</h2>
                   <div className="p-3">
-                    {/* Authentication Section */}
-                    <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa', fontSize: '0.9em' }}>
+                    {/* Authentication Section - Hidden */}
+                    <div className="auth-section" style={{ display: 'none', marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa', fontSize: '0.9em' }}>
                       <h5 style={{ fontSize: '1em', marginBottom: '10px' }}>Authentication</h5>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <button 
@@ -1112,7 +1162,7 @@ function App() {
                         <div className="form-group">
                           <input type="text" id="phone" className="form-control" placeholder="e.g., +61412345678" value={phone} onChange={handlePhoneChange} />
                         </div>
-                        <button type="submit" id="verifyBtn" className="btn btn-primary" disabled={!isAuthenticated}>Verify</button>
+                        <button type="submit" id="verifyBtn" className="btn btn-primary">Verify</button>
                       </div>
                       {error && <div id="error" className="alert alert-danger">{error}</div>}
                       {success && <div id="success" className="alert alert-success">{success}</div>}
@@ -1177,6 +1227,7 @@ function App() {
                 <div id="medicalDetails" className="card">
                   <h2 className="card-header">4. Patient Medical Details</h2>
                   <ul className="details-list">
+                    {patientMedicalDetails.alert && <li style={{ backgroundColor: '#fff3cd', padding: '4px 6px', borderRadius: '2px', marginBottom: '4px', fontSize: '0.8em', color: '#856404' }}><strong>⚠️</strong> {patientMedicalDetails.alert}</li>}
                     <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                     <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                     <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
@@ -1211,7 +1262,10 @@ function App() {
                   <div className="p-3">
                     <div className="api-buttons">
                       <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
-                      {patientStatus !== 'Checked In' && (
+                      {patientStatus === 'Awaiting Check-in' && (
+                        <button className="btn btn-success" onClick={handleCompleteCheckIn}>Complete Check-in</button>
+                      )}
+                      {patientStatus !== 'Checked In' && patientStatus !== 'Awaiting Check-in' && (
                         <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Medical Details Entry and Transport</button>
                       )}
                       {patientStatus === 'Checked In' && <>
@@ -1255,6 +1309,8 @@ function App() {
       <footer className="footer">
         &copy; 2026 MWC Event
       </footer>
+      </>
+      )}
     </div>
   );
 }

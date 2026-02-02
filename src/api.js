@@ -20,10 +20,41 @@ async function post(url, body, customHeaders = {}) {
 }
 
 export function verifyPhoneNumber(phoneNumber) {
-    const accessToken = authService.getAccessToken();
-    return post(`${API_BASE_URL}/number-verification/number-verification/v0/verify`, { phoneNumber }, {
-        'Authorization': `Bearer ${accessToken}`
+    return ensureValidToken().then(() => {
+        const accessToken = authService.getAccessToken();
+        return post(`${API_BASE_URL}/number-verification/number-verification/v0/verify`, { phoneNumber }, {
+            'Authorization': `Bearer ${accessToken}`
+        });
     });
+}
+
+async function ensureValidToken() {
+    if (authService.isTokenValid()) {
+        return Promise.resolve();
+    }
+    
+    console.log('⚠️ Token expired or invalid, triggering silent re-authentication...');
+    
+    // Save outpatient status before re-authentication
+    const currentOutpatientStatus = localStorage.getItem('outpatientStatus');
+    
+    // Use already-saved activeScreen from localStorage
+    const appState = {
+        activeScreen: localStorage.getItem('activeScreen'),
+        verifiedPhoneNumber: localStorage.getItem('verifiedPhoneNumber'),
+        outpatientStatus: currentOutpatientStatus,
+        timestamp: Date.now()
+    };
+    authService.saveAppState(appState);
+    
+    // Get phone number for re-authentication
+    const phoneNumber = localStorage.getItem('verifiedPhoneNumber') || '+99999991000';
+    
+    // Trigger re-authentication (will redirect)
+    await authService.authenticate(phoneNumber);
+    
+    // This line won't be reached due to redirect, but needed for promise chain
+    return new Promise(() => {});
 }
 
 export function kycMatch(data) {
@@ -305,16 +336,11 @@ export function createGeofencingSubscription(phoneNumber, latitude, longitude, r
 }
 
 export function deleteGeofencingSubscription(subscriptionId) {
-    return axios.delete(`https://network-as-code.p-eu.rapidapi.com/geofencing-subscriptions/v0.3/subscriptions/${subscriptionId}`, { headers: defaultHeaders }).then(response => response.data);
-    // return axios.delete(`${API_BASE_URL}/geofencing-subscriptions/v0.3/subscriptions/${subscriptionId}`, { headers: defaultHeaders });
-    /*
-     return new Promise(resolve => {
-        setTimeout(() => {
-            resolve({
-                status: "deleted"
-            });
-        }, 500);
-    }); */
+    return axios.delete(`https://network-as-code.p-eu.rapidapi.com/geofencing-subscriptions/v0.3/subscriptions/${subscriptionId}`, { headers: defaultHeaders })
+        .then(response => response.data || { status: "deleted" })
+        .catch(error => {
+            throw error;
+        });
 }
 
 export function carrierBilling(phoneNumber) {
@@ -343,6 +369,38 @@ export function carrierBilling(phoneNumber) {
 }
 
 
+export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage, setPatientStatus, logApi) {
+    addMessage("Doctor confirmed check-in. Completing check-in process...");
+    setPatientStatus("Checked In");
+    addMessage("Welcome to CityCare Hospital Barcelona!");
+    addMessage("Patient check-in complete.");
+
+    addMessage("Creating Geofencing Subscription for patient monitoring...");
+    const geoSub = await createGeofencingSubscription(phoneNumber, hospitalLocation.lat, hospitalLocation.lng, 500);
+    if (logApi) logApi('Create Geofencing Subscription', 'POST', '/geofencing-subscriptions/v0.3/subscriptions', {
+        protocol: "HTTP",
+        sink: "https://notificationSendServer12.supertelco.com",
+        types: ["org.camaraproject.geofencing-subscriptions.v0.area-entered"],
+        config: {
+            subscriptionDetail: {
+                device: { phoneNumber },
+                area: {
+                    areaType: "CIRCLE",
+                    center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng },
+                    radius: 500
+                }
+            },
+            initialEvent: true,
+            subscriptionMaxEvents: 10,
+            subscriptionExpireTime: "2026-03-20T05:40:58.469Z"
+        }
+    }, geoSub);
+    const subId = geoSub.id || geoSub.subscriptionId;
+    addMessage(`Geofencing Subscription Created: ID ${subId}`);
+
+    return subId;
+}
+
 export async function startMedicalTransportSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, logApi) {
     addMessage("Starting Medical Transport sequence...");
 
@@ -354,6 +412,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
     addMessage("Populating patient medical details...");
     setPatientMedicalDetails({
         patientId: patientId,
+        alert: 'INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness',
         esi: 'Level 2 (Emergency)',
         vitals: 'Pulse 120, blood pressure 160/110, oxygen saturation 93%, body temperature 39.0',
         complaint: 'Chest pain',
@@ -596,12 +655,22 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
 
     addMessage(`Patient ${guestName} has left the premises. Contact him on ${phoneNumber}`);
     setPatientStatus("Checked Out");
+    
+    // Clear session storage and localStorage after checkout
+    sessionStorage.clear();
+    localStorage.removeItem('outpatientStatus');
 
     if (geofencingSubscriptionId) {
         addMessage(`Deleting Geofencing Subscription ${geofencingSubscriptionId}...`);
-        const delRes = await deleteGeofencingSubscription(geofencingSubscriptionId);
-        if (logApi) logApi('Delete Geofencing Subscription', 'DELETE', `/geofencing-subscriptions/v0.3/subscriptions/${geofencingSubscriptionId}`, {}, delRes);
-        addMessage("Geofencing Subscription Deleted.");
+        try {
+            const delRes = await deleteGeofencingSubscription(geofencingSubscriptionId);
+            if (logApi) logApi('Delete Geofencing Subscription', 'DELETE', `/geofencing-subscriptions/v0.3/subscriptions/${geofencingSubscriptionId}`, {}, delRes);
+            addMessage("Geofencing Subscription Deleted.");
+        } catch (error) {
+            const errorResponse = error.response ? { status: error.response.status, data: error.response.data } : { error: error.message };
+            if (logApi) logApi('Delete Geofencing Subscription', 'DELETE', `/geofencing-subscriptions/v0.3/subscriptions/${geofencingSubscriptionId}`, {}, errorResponse);
+            addMessage(`Error deleting Geofencing Subscription: ${error.response?.status || error.message}`);
+        }
     }
 }
 
