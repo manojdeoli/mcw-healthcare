@@ -284,7 +284,6 @@ function App() {
           // Check if we need to resume monitoring
           const shouldResumeMonitoring = localStorage.getItem('shouldResumeMonitoring');
           if (shouldResumeMonitoring === 'true') {
-            localStorage.removeItem('shouldResumeMonitoring');
             // Trigger monitoring after a short delay to let state settle
             setTimeout(() => {
               const monitoringBtns = document.querySelectorAll('button');
@@ -740,6 +739,10 @@ function App() {
     }
 
     if (mode === 'arrival') {
+      const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
+      const alertMessage = `INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness`;
+      syncSetPatientMedicalDetails({ patientId, alert: alertMessage, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
+      addMessage(`Alert! Incoming patient (ID: ${patientId}). High-level symptoms: Chest pains and intermittent consciousness.`);
       addMessage("Fetching patient details with KYC Fill...");
       const kycData = await api.kycFill(phone);
       logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData._obscured);
@@ -864,6 +867,9 @@ function App() {
       return;
     }
     
+    // Clear the flag first to prevent auto-resume on refresh
+    localStorage.removeItem('shouldResumeMonitoring');
+    
     // Save current screen and flag to resume monitoring after OAuth
     localStorage.setItem('activeScreen', activeScreen.toString());
     localStorage.setItem('shouldResumeMonitoring', 'true');
@@ -884,9 +890,14 @@ function App() {
         }
 
         await api.startOutpatientMonitoringSequence(phone, startLoc, addMessage, syncSetLocation, syncSetUserGps, syncSetOutpatientStatus, syncSetArtificialTime, logApiInteraction);
+        
+        // Clear the flag after monitoring starts successfully
+        localStorage.removeItem('shouldResumeMonitoring');
     } catch (e) {
         console.error(e);
         addMessage("Error in monitoring sequence: " + e.message);
+        // Clear flag on error too
+        localStorage.removeItem('shouldResumeMonitoring');
     }
   };
 
@@ -1026,6 +1037,7 @@ function App() {
                   <div id="medicalDetails" className="card">
                     <h2 className="card-header">4. Patient Medical Details</h2>
                     <ul className="details-list">
+                      {patientMedicalDetails.alert && <li style={{ background: '#fff3cd', padding: '4px 6px', marginBottom: '4px', borderRadius: '2px', fontSize: '0.8em', color: '#856404' }}>{patientMedicalDetails.alert}</li>}
                       <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                       <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                       <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
@@ -1152,6 +1164,7 @@ function App() {
                 <div id="medicalDetails" className="card">
                   <h2 className="card-header">4. Patient Medical Details</h2>
                   <ul className="details-list">
+                    {patientMedicalDetails.alert && <li style={{ background: '#fff3cd', padding: '4px 6px', marginBottom: '4px', borderRadius: '2px', fontSize: '0.8em', color: '#856404' }}>{patientMedicalDetails.alert}</li>}
                     <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                     <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                     <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>

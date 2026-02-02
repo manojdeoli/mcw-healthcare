@@ -30,6 +30,7 @@ export function verifyPhoneNumber(phoneNumber) {
 
 async function ensureValidToken() {
     if (authService.isTokenValid()) {
+        console.log('✅ Token is valid, no re-authentication needed');
         return Promise.resolve();
     }
     
@@ -431,11 +432,9 @@ export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage,
 }
 
 export async function startMedicalTransportSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, logApi) {
-    addMessage("Starting Medical Transport sequence...");
-
-    // Generate patient ID
     const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
-    addMessage(`Alert! Incoming patient (ID: ${patientId}). High-level symptoms: Chest pains and intermittent consciousness.`);
+    
+    addMessage("Starting Medical Transport sequence...");
 
     await new Promise(resolve => setTimeout(resolve, 2000));
     addMessage("Populating patient medical details...");
@@ -605,7 +604,8 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
         
         if (!geofenceBreached && distance > geofenceRadius) {
             geofenceBreached = true;
-            addMessage(`ALERT: Patient has moved out of hospital vicinity (Distance: ${Math.round(distance)}m). Geofence Exit Detected.`);
+            addMessage(`Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`);
+            setPatientMedicalDetails({ patientId: '', alert: `Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
         }
 
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -682,7 +682,7 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
         addMessage("Carrier Billing Failed.");
     }*/
 
-    addMessage(`Patient ${guestName} has left the premises. Contact him on ${phoneNumber}`);
+    addMessage(`Patient ${guestName} has left the premises. Contact at ${phoneNumber}`);
     setPatientStatus("Checked Out");
     
     // Clear session storage and localStorage after checkout
