@@ -495,7 +495,7 @@ function App() {
     // 1. Use KYC Fill to partially populate
     addMessage("Partially populating form with KYC Fill...");
     const kycData = await api.kycFill(phone);
-    logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData);
+    logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData._obscured);
     
     syncSetFormState(kycData);
 

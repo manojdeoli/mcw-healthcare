@@ -240,7 +240,16 @@ export async function kycFill(phoneNumber) {
         name: response.name || '',
         address: response.address || '',
         email: response.email || '',
-        birthdate: response.birthdate || ''
+        birthdate: response.birthdate || '',
+        // Obscured version for logging
+        _obscured: {
+            phoneNumber: response.phoneNumber,
+            idDocument: response.idDocument,
+            name: response.name ? 'XXXXX' : '',
+            address: response.address ? 'XXXXX' : '',
+            email: response.email ? 'XXXXX' : '',
+            birthdate: response.birthdate ? 'XXXXX' : ''
+        }
     };
 }
 
