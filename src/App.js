@@ -901,33 +901,6 @@ function App() {
               <div id="verification-container" className="card">
                 <h2 className="card-header">1. Phone Verification</h2>
                 <div className="p-3">
-                  {/* Authentication Section */}
-                  <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: isAuthenticated ? '#d4edda' : '#f8f9fa', fontSize: '0.9em' }}>
-                    <h5 style={{ fontSize: '1em', marginBottom: '10px' }}>Authentication Status</h5>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <button 
-                        className={`btn ${(isAuthenticated && tokenExpirySeconds > 0) ? 'btn-success' : 'btn-warning'}`} 
-                        onClick={handleAuthentication}
-                        disabled={isAuthenticating}
-                        style={{ fontSize: '0.85em', padding: '6px 12px' }}
-                      >
-                        {isAuthenticating ? 'Authenticating...' : (isAuthenticated && tokenExpirySeconds > 0) ? 'Authenticated ✓' : 'Authenticate'}
-                      </button>
-                      <span style={{ color: (isAuthenticated && tokenExpirySeconds > 0) ? 'green' : 'orange', fontWeight: 'bold', fontSize: '0.9em' }}>
-                        {(isAuthenticated && tokenExpirySeconds > 0) ? 'Ready to use APIs' : 'Click to authenticate'}
-                      </span>
-                    </div>
-                    {isAuthenticated && tokenExpirySeconds !== null && (
-                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: tokenExpirySeconds < 60 ? '#fff3cd' : '#d1ecf1', borderRadius: '5px', fontSize: '0.85em' }}>
-                        <strong style={{ color: tokenExpirySeconds < 60 ? '#856404' : '#0c5460' }}>
-                          Re-authentication required in: {tokenExpirySeconds} seconds
-                          {tokenExpirySeconds < 60 && ' - Please click Authenticate button!'}
-                        </strong>
-                      </div>
-                    )}
-                    {authError && <div className="alert alert-danger" style={{ marginTop: '10px', fontSize: '0.85em' }}>{authError}</div>}
-                  </div>
-                  
                   <form onSubmit={validatePhone}>
                     <div className="verify-form-container">
                       <div className="form-group">
@@ -1055,32 +1028,6 @@ function App() {
                 <div id="verification-container" className="card">
                   <h2 className="card-header">1. Phone Verification</h2>
                   <div className="p-3">
-                    {/* Authentication Section */}
-                    <div className="auth-section" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#f8f9fa', fontSize: '0.9em' }}>
-                      <h5 style={{ fontSize: '1em', marginBottom: '10px' }}>Authentication</h5>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <button 
-                          className={`btn ${(isAuthenticated && tokenExpirySeconds > 0) ? 'btn-success' : 'btn-warning'}`} 
-                          onClick={handleAuthentication}
-                          disabled={isAuthenticating}
-                          style={{ fontSize: '0.85em', padding: '6px 12px' }}
-                        >
-                          {isAuthenticating ? 'Authenticating...' : (isAuthenticated && tokenExpirySeconds > 0) ? 'Authenticated ✓' : 'Authenticate'}
-                        </button>
-                        <span style={{ color: (isAuthenticated && tokenExpirySeconds > 0) ? 'green' : 'orange', fontSize: '0.9em' }}>
-                          {(isAuthenticated && tokenExpirySeconds > 0) ? 'Ready to use APIs' : 'Authentication required'}
-                        </span>
-                      </div>
-                      {isAuthenticated && tokenExpirySeconds !== null && (
-                        <div style={{ marginTop: '10px', padding: '8px', backgroundColor: tokenExpirySeconds < 60 ? '#fff3cd' : '#d1ecf1', borderRadius: '5px', fontSize: '0.85em' }}>
-                          <strong style={{ color: tokenExpirySeconds < 60 ? '#856404' : '#0c5460' }}>
-                            Re-authentication required in: {tokenExpirySeconds} seconds
-                            {tokenExpirySeconds < 60 && ' - Please click Authenticate button!'}
-                          </strong>
-                        </div>
-                      )}
-                      {authError && <div className="alert alert-danger" style={{ marginTop: '10px', fontSize: '0.85em' }}>{authError}</div>}
-                    </div>
                     
                     <form onSubmit={validatePhone}>
                       <div className="verify-form-container">
