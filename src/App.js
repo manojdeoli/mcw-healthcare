@@ -604,7 +604,9 @@ function App() {
     }
   }, [artificialTime, identityIntegrity, lastIntegrityCheckTime]);
 
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(() => {
+    return localStorage.getItem('pendingPhoneVerification') || '';
+  });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -656,6 +658,10 @@ function App() {
       setError('Please enter a valid international phone number (e.g., +61412345678).');
       return;
     }
+    
+    // Save current screen and phone number before verification
+    localStorage.setItem('activeScreen', activeScreen.toString());
+    localStorage.setItem('pendingPhoneVerification', fullPhoneNumber);
 
     setIsLoading(true);
     try {
@@ -667,6 +673,7 @@ function App() {
         setSuccess('Phone number is verified.');
         setVerifiedPhoneNumber(fullPhoneNumber);
         localStorage.setItem('verifiedPhoneNumber', fullPhoneNumber);
+        localStorage.removeItem('pendingPhoneVerification');
         broadcast('SET_VERIFIED_PHONE', fullPhoneNumber);
       } else {
         setError(`Phone number verification failed.`);
