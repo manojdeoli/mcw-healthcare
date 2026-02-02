@@ -58,6 +58,7 @@ async function ensureValidToken() {
 }
 
 export function kycMatch(data) {
+    // return post(`${API_BASE_URL}/kyc-match/kyc-match/v0.2/match`, data);
     return new Promise(resolve => {
         setTimeout(() => {
             const stored = storedKycFillData[data.phoneNumber];
