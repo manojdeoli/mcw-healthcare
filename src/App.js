@@ -490,15 +490,8 @@ function App() {
       alert('Please verify your phone number first to start registration.');
       return;
     }
-    addMessage("Starting Registration Sequence...");
-
-    // 1. Use KYC Fill to partially populate
-    addMessage("Partially populating form with KYC Fill...");
-    const kycData = await api.kycFill(phone);
-    logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData._obscured);
-    
-    syncSetFormState(kycData);
-    addMessage("Form populated. Please review and click 'KYC Match' to verify.");
+    syncSetRegistrationStatus('Registered');
+    addMessage("Registration Status: Registered");
   };
 
   const submitKyc = async () => {
@@ -695,6 +688,14 @@ function App() {
     if (mode === 'departure' && patientStatus !== 'Checked In') {
       addMessage("Patient is not Checked In.");
       return;
+    }
+
+    if (mode === 'arrival') {
+      addMessage("Fetching patient details with KYC Fill...");
+      const kycData = await api.kycFill(phone);
+      logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData._obscured);
+      syncSetFormState(kycData);
+      addMessage("Patient details populated.");
     }
 
     setIsSequenceRunning(true);
