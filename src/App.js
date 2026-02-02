@@ -209,7 +209,10 @@ function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState('');
   const [tokenExpirySeconds, setTokenExpirySeconds] = useState(null);
-  const [activeScreen, setActiveScreen] = useState(1);
+  const [activeScreen, setActiveScreen] = useState(() => {
+    const saved = localStorage.getItem('activeScreen');
+    return saved ? parseInt(saved) : 1;
+  });
   const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState(() => {
     const stored = localStorage.getItem('verifiedPhoneNumber');
     return (stored && stored !== 'null' && stored !== 'undefined') ? stored : null;
@@ -265,6 +268,39 @@ function App() {
           localStorage.removeItem('auth_url_step3');
           localStorage.setItem('has_authenticated', 'true');
           broadcast('SET_VERIFIED_PHONE', authResult.phoneNumber);
+          
+          // Check if we need to resume verification
+          const shouldResume = localStorage.getItem('shouldResumeVerification');
+          const pendingPhone = localStorage.getItem('pendingPhoneVerification');
+          if (shouldResume === 'true' && pendingPhone) {
+            localStorage.removeItem('shouldResumeVerification');
+            // Trigger verification after a short delay to let state settle
+            setTimeout(() => {
+              const verifyBtn = document.getElementById('verifyBtn');
+              if (verifyBtn) verifyBtn.click();
+            }, 100);
+          }
+          
+          // Check if we need to resume monitoring
+          const shouldResumeMonitoring = localStorage.getItem('shouldResumeMonitoring');
+          if (shouldResumeMonitoring === 'true') {
+            localStorage.removeItem('shouldResumeMonitoring');
+            // Trigger monitoring after a short delay to let state settle
+            setTimeout(() => {
+              const monitoringBtns = document.querySelectorAll('button');
+              monitoringBtns.forEach(btn => {
+                if (btn.textContent === 'Start Monitoring') {
+                  btn.click();
+                }
+              });
+            }, 100);
+          }
+          
+          // Restore outpatient monitoring status
+          const savedOutpatientStatus = localStorage.getItem('outpatientStatus');
+          if (savedOutpatientStatus && savedOutpatientStatus !== 'Inactive') {
+            syncSetOutpatientStatus(savedOutpatientStatus);
+          }
         } else if (authResult.error) {
           setAuthError(authResult.error);
         }
@@ -543,7 +579,9 @@ function App() {
     }
   }, [artificialTime, identityIntegrity, lastIntegrityCheckTime]);
 
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(() => {
+    return localStorage.getItem('pendingPhoneVerification') || '';
+  });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -592,11 +630,11 @@ function App() {
       setError('Please enter a valid international phone number (e.g., +61412345678).');
       return;
     }
-
-    if (!isAuthenticated) {
-      setError('Please authenticate first before verifying phone number.');
-      return;
-    }
+    
+    // Save current screen and phone number before verification
+    localStorage.setItem('activeScreen', activeScreen.toString());
+    localStorage.setItem('pendingPhoneVerification', fullPhoneNumber);
+    localStorage.setItem('shouldResumeVerification', 'true');
 
     setIsLoading(true);
     try {
@@ -608,6 +646,7 @@ function App() {
         setSuccess('Phone number is verified.');
         setVerifiedPhoneNumber(fullPhoneNumber);
         localStorage.setItem('verifiedPhoneNumber', fullPhoneNumber);
+        localStorage.removeItem('pendingPhoneVerification');
         broadcast('SET_VERIFIED_PHONE', fullPhoneNumber);
       } else {
         setError(`Phone number verification failed.`);
@@ -676,6 +715,16 @@ function App() {
     return (
       <div className="status-text-error">{text}</div>
     );
+  };
+
+  const handleCompleteCheckIn = async () => {
+    const phone = getVerifiedNumber();
+    if (!phone || !hospitalLocation) {
+      alert('Missing phone number or hospital location.');
+      return;
+    }
+    const subId = await api.completeCheckIn(phone, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction);
+    if (subId) syncSetGeofencingSubscriptionId(subId);
   };
 
   const handlePatientSequence = async (mode) => {
@@ -795,9 +844,6 @@ function App() {
           syncSetKycMatchResponse(null);
           syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
           syncSetArtificialTime(null);
-          setVerifiedPhoneNumber(null);
-          localStorage.removeItem('verifiedPhoneNumber');
-          broadcast('SET_VERIFIED_PHONE', null);
           setPhone('');
           setSuccess('');
           setSimulationMode('arrival');
@@ -817,6 +863,10 @@ function App() {
       alert('Please verify your phone number first.');
       return;
     }
+    
+    // Save current screen and flag to resume monitoring after OAuth
+    localStorage.setItem('activeScreen', activeScreen.toString());
+    localStorage.setItem('shouldResumeMonitoring', 'true');
     
     syncSetArtificialTime(new Date());
     setIsSequenceRunning(true);
@@ -885,8 +935,11 @@ function App() {
                 <div className="p-3">
                   <div className="api-buttons">
                     <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
-                    {patientStatus !== 'Checked In' && (
+                    {patientStatus !== 'Checked In' && patientStatus !== 'Awaiting Check-in' && (
                       <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Admit Patient & Monitor Transport</button>
+                    )}
+                    {patientStatus === 'Awaiting Check-in' && (
+                      <button className="btn btn-success" onClick={handleCompleteCheckIn}>Complete Check-in</button>
                     )}
                     {patientStatus === 'Checked In' && <>
                       <button className="btn btn-primary" onClick={() => handlePatientSequence('departure')}>Patient Abscondment</button>
@@ -906,7 +959,7 @@ function App() {
                       <div className="form-group">
                         <input type="text" id="phone" className="form-control" placeholder="e.g., +61412345678" value={phone} onChange={handlePhoneChange} />
                       </div>
-                      <button type="submit" id="verifyBtn" className="btn btn-primary" disabled={!isAuthenticated}>Verify</button>
+                      <button type="submit" id="verifyBtn" className="btn btn-primary">Verify</button>
                     </div>
                     {error && <div id="error" className="alert alert-danger">{error}</div>}
                     {success && <div id="success" className="alert alert-success">{success}</div>}
@@ -1034,7 +1087,7 @@ function App() {
                         <div className="form-group">
                           <input type="text" id="phone" className="form-control" placeholder="e.g., +61412345678" value={phone} onChange={handlePhoneChange} />
                         </div>
-                        <button type="submit" id="verifyBtn" className="btn btn-primary" disabled={!isAuthenticated}>Verify</button>
+                        <button type="submit" id="verifyBtn" className="btn btn-primary">Verify</button>
                       </div>
                       {error && <div id="error" className="alert alert-danger">{error}</div>}
                       {success && <div id="success" className="alert alert-success">{success}</div>}
@@ -1133,8 +1186,11 @@ function App() {
                   <div className="p-3">
                     <div className="api-buttons">
                       <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
-                      {patientStatus !== 'Checked In' && (
+                      {patientStatus !== 'Checked In' && patientStatus !== 'Awaiting Check-in' && (
                         <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Admit Patient & Monitor Transport</button>
+                      )}
+                      {patientStatus === 'Awaiting Check-in' && (
+                        <button className="btn btn-success" onClick={handleCompleteCheckIn}>Complete Check-in</button>
                       )}
                       {patientStatus === 'Checked In' && <>
                         <button className="btn btn-primary" onClick={() => handlePatientSequence('departure')}>Patient Abscondment</button>
