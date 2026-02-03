@@ -11,6 +11,7 @@ import authService from './auth';
 import { formFields, generatePatientId } from './formFields';
 import ambulanceIconPng from './ambulance.png';
 import patientIconPng from './patient.png';
+import emergencyRoomBg from './emergency1.png';
 
 
 // --- Fix for Leaflet's default icon ---
@@ -410,11 +411,19 @@ function App() {
         case 'ADD_API_LOG':
           setApiLogs(prev => [data, ...prev]);
           break;
+        case 'COMPLETE_CHECKIN':
+          const phone = verifiedPhoneNumber || localStorage.getItem('verifiedPhoneNumber');
+          if (phone && hospitalLocation) {
+            api.completeCheckIn(phone, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction).then(subId => {
+              if (subId) syncSetGeofencingSubscriptionId(subId);
+            });
+          }
+          break;
         default: break;
       }
     };
     return () => channelRef.current?.close();
-  }, []);
+  }, [verifiedPhoneNumber, hospitalLocation]);
 
   const broadcast = (type, data) => {
     channelRef.current?.postMessage({ type, data });
@@ -488,6 +497,7 @@ function App() {
     formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {})
   );
   const [additionalPatients, setAdditionalPatients] = useState([]);
+  const [kioskWindow, setKioskWindow] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -649,6 +659,9 @@ function App() {
         broadcast('SET_VERIFIED_PHONE', fullPhoneNumber);
       } else {
         setError(`Phone number verification failed.`);
+        setVerifiedPhoneNumber(null);
+        localStorage.removeItem('verifiedPhoneNumber');
+        broadcast('SET_VERIFIED_PHONE', null);
       }
     } catch (err) {
       console.error('API call failed:', err);
@@ -901,6 +914,198 @@ function App() {
     }
   };
 
+  const openKioskDisplay = () => {
+    const newWindow = window.open('', 'ERKiosk', 'width=1800,height=1000');
+    if (!newWindow) {
+      alert('Please allow popups for this site');
+      return;
+    }
+    setKioskWindow(newWindow);
+  };
+
+  // Close kiosk window when main window closes
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (kioskWindow && !kioskWindow.closed) {
+        kioskWindow.close();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [kioskWindow]);
+
+  useEffect(() => {
+    if (!kioskWindow || kioskWindow.closed) return;
+
+    const doc = kioskWindow.document;
+    
+    // Only write the HTML structure once
+    if (!doc.getElementById('kiosk-content')) {
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Emergency Room Kiosk</title>
+          <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              background: url('${emergencyRoomBg}') no-repeat center center fixed;
+              background-size: cover;
+              font-family: Arial, sans-serif;
+              overflow: hidden;
+              font-weight: 600;
+              color: #000;
+            }
+            .kiosk-container {
+              position: absolute;
+              top: 60%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 90%;
+              height: 90%;
+              background: rgba(255, 255, 255, 0.7);
+              border: 8px solid #333;
+              border-radius: 10px;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+              overflow-y: auto;
+              padding: 20px;
+            }
+            .card { margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; }
+            .card-header { background: #007bff; color: white; padding: 8px 12px; font-weight: bold; border-radius: 5px 5px 0 0; font-size: 0.9em; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+            .details-list { list-style: none; padding: 12px; margin: 0; font-size: 0.9em; font-weight: 600; }
+            .details-list li { padding: 6px 0; border-bottom: 1px solid #eee; }
+            .details-list li:last-child { border-bottom: none; }
+            .p-3 { padding: 12px; font-size: 0.9em; font-weight: 600; }
+            .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+            .btn-primary { background: #007bff; color: white; }
+            .btn-success { background: #28a745; color: white; }
+            .api-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+            .form-control { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+            .verify-form-container { display: flex; gap: 10px; align-items: center; }
+            .alert { padding: 10px; margin: 10px 0; border-radius: 4px; }
+            .alert-info { background: #d1ecf1; color: #0c5460; }
+            .alert-success { background: #d4edda; color: #155724; }
+            .alert-danger { background: #f8d7da; color: #721c24; }
+          </style>
+        </head>
+        <body>
+          <div class="kiosk-container" id="kiosk-content"></div>
+          <script>
+            const channel = new BroadcastChannel('healthcare_demo_sync_v2');
+            let state = {};
+            
+            channel.onmessage = (event) => {
+              const { type, data } = event.data;
+              switch (type) {
+                case 'SET_VERIFIED_PHONE': state.verifiedPhoneNumber = data; break;
+                case 'SET_IDENTITY_INTEGRITY': state.identityIntegrity = data; break;
+                case 'SET_REGISTRATION_STATUS': state.registrationStatus = data; break;
+                case 'SET_PATIENT_STATUS': state.patientStatus = data; break;
+                case 'SET_OUTPATIENT_STATUS': state.outpatientStatus = data; break;
+                case 'SET_MEDICAL_DETAILS': state.patientMedicalDetails = data; break;
+                case 'SET_ADDITIONAL_PATIENTS': state.additionalPatients = data; break;
+                case 'SET_FORM_STATE': state.formState = data; break;
+                case 'KIOSK_UPDATE': state = { ...state, ...data }; break;
+              }
+              render();
+            };
+            
+            function render() {
+              const content = document.getElementById('kiosk-content');
+              if (!content) return;
+              
+              const s = state;
+              const hasPatientData = s.verifiedPhoneNumber;
+              
+              if (!hasPatientData) {
+                content.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 2em; color: #666; text-align: center;"><div><div style="font-size: 3em; margin-bottom: 20px;">🏥</div>Waiting for patient admission...</div></div>';
+                return;
+              }
+              
+              const html = '<div style="display: flex; gap: 20px; flex-wrap: wrap;">' +
+                '<div style="flex: 1; min-width: 300px;">' +
+                  '<div class="card">' +
+                    '<h2 class="card-header">1. Phone Verification</h2>' +
+                    '<div class="p-3">' +
+                      '<div style="padding: 8px; background: #f8f9fa; border-radius: 4px;">' +
+                        '<strong>Phone:</strong> ' + (s.phone || 'Not entered') +
+                      '</div>' +
+                      (s.verifiedPhoneNumber ? '<div class="alert alert-success" style="margin-top: 10px;">✓ Phone verified</div>' : '<div class="alert alert-info" style="margin-top: 10px;">⚠ Not verified</div>') +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="card">' +
+                    '<h2 class="card-header">2. Patient Status</h2>' +
+                    '<ul class="details-list">' +
+                      '<li><strong>Identity Integrity:</strong> <span style="color: ' + (s.identityIntegrity === 'Good' ? 'green' : (s.identityIntegrity === 'Bad' ? 'red' : 'black')) + '">' + (s.identityIntegrity || 'Bad') + '</span></li>' +
+                      '<li><strong>Registration Status:</strong> <span style="color: ' + (s.registrationStatus === 'Registered' ? 'green' : 'red') + '">' + (s.registrationStatus || 'Not Registered') + '</span></li>' +
+                      '<li><strong>Patient Status:</strong> <span style="color: ' + (s.patientStatus === 'Checked In' ? 'green' : 'red') + '">' + (s.patientStatus || 'Not Checked In') + '</span></li>' +
+                    '</ul>' +
+                    (s.patientStatus === 'Awaiting Check-in' ? '<div class="p-3"><button class="btn btn-success" onclick="completeCheckIn()">Complete Check-in</button></div>' : '') +
+                  '</div>' +
+                  '<div class="card">' +
+                    '<h2 class="card-header">3. Patient Personal Details</h2>' +
+                    '<div class="p-3">' +
+                      '<div><strong>Name:</strong> ' + (s.formState?.name || 'N/A') + '</div>' +
+                      '<div><strong>Email:</strong> ' + (s.formState?.email || 'N/A') + '</div>' +
+                      '<div><strong>Address:</strong> ' + (s.formState?.address || 'N/A') + '</div>' +
+                      '<div><strong>Birthdate:</strong> ' + (s.formState?.birthdate || 'N/A') + '</div>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div style="flex: 1; min-width: 300px;">' +
+                  '<div class="card">' +
+                    '<h2 class="card-header">4. Patient Medical Details</h2>' +
+                    '<ul class="details-list">' +
+                      (s.patientMedicalDetails?.alert ? '<li style="background: #fff3cd; padding: 4px 6px; margin-bottom: 4px; border-radius: 2px; font-size: 0.8em; color: #856404;">' + s.patientMedicalDetails.alert + '</li>' : '') +
+                      '<li><strong>Patient ID:</strong> ' + (s.patientMedicalDetails?.patientId || 'N/A') + '</li>' +
+                      '<li><strong>Emergency Severity Index:</strong> ' + (s.patientMedicalDetails?.esi || 'N/A') + '</li>' +
+                      '<li><strong>Vital signs:</strong> ' + (s.patientMedicalDetails?.vitals || 'N/A') + '</li>' +
+                      '<li><strong>Chief Complaint:</strong> ' + (s.patientMedicalDetails?.complaint || 'N/A') + '</li>' +
+                      '<li><strong>ETA:</strong> ' + (s.patientMedicalDetails?.eta || 'N/A') + '</li>' +
+                      (s.patientMedicalDetails?.medicalHistory ? '<li><strong>Medical History:</strong> ' + s.patientMedicalDetails.medicalHistory + '</li>' : '') +
+                      (s.patientMedicalDetails?.treatmentNeeds?.specialists?.length > 0 ? '<li><strong>Specialists Required:</strong> ' + s.patientMedicalDetails.treatmentNeeds.specialists.join(', ') + '</li>' : '') +
+                      (s.patientMedicalDetails?.treatmentNeeds?.equipment?.length > 0 ? '<li><strong>Equipment Needed:</strong> ' + s.patientMedicalDetails.treatmentNeeds.equipment.join(', ') + '</li>' : '') +
+                    '</ul>' +
+                  '</div>' +
+                  (s.additionalPatients?.length > 0 ? '<div class="card"><h2 class="card-header">Additional Patients</h2><div class="p-3">' + s.additionalPatients.map(p => '<div style="padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;"><div><strong>' + p.name + '</strong> (ID: ' + p.id + ')</div><div style="font-size: 0.9em; color: #666;">' + p.symptoms + '</div></div>').join('') + '</div></div>' : '') +
+                  '<div class="card">' +
+                    '<h2 class="card-header">5. Outpatient Monitoring</h2>' +
+                    '<ul class="details-list">' +
+                      '<li><strong>Status:</strong> <span style="color: ' + (s.outpatientStatus?.includes('Anomaly') ? 'red' : (s.outpatientStatus === 'Inactive' ? 'black' : 'green')) + '">' + (s.outpatientStatus || 'Inactive') + '</span></li>' +
+                    '</ul>' +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+              content.innerHTML = html;
+            }
+            
+            function completeCheckIn() {
+              channel.postMessage({ type: 'COMPLETE_CHECKIN' });
+            }
+          </script>
+        </body>
+        </html>
+      `);
+      doc.close();
+    }
+    
+    // Send initial state to kiosk
+    broadcast('KIOSK_UPDATE', {
+      phone,
+      verifiedPhoneNumber,
+      identityIntegrity,
+      registrationStatus,
+      patientStatus,
+      outpatientStatus,
+      formState,
+      patientMedicalDetails,
+      additionalPatients
+    });
+  }, [kioskWindow, phone, verifiedPhoneNumber, identityIntegrity, registrationStatus, patientStatus, formState, patientMedicalDetails, additionalPatients, outpatientStatus]);
+
   return (
     <div className="App">
       {isLoading &&
@@ -920,6 +1125,7 @@ function App() {
         <button className={`btn ${activeScreen === 1 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(1)}>1. API Interactions</button>
         <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(2)}>2. Hospital Dashboard</button>
         <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>3. All Details</button>
+        <button className="btn btn-success" style={{ margin: '0 5px' }} onClick={openKioskDisplay}>🏥 Open ER Kiosk Display</button>
       </nav>
 
       <main className="main-content">
