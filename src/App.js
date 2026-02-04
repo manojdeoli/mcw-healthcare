@@ -924,16 +924,7 @@ function App() {
     setKioskWindow(newWindow);
   };
 
-  // Close kiosk window when main window closes
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (kioskWindow && !kioskWindow.closed) {
-        kioskWindow.close();
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [kioskWindow]);
+
 
   useEffect(() => {
     if (!kioskWindow || kioskWindow.closed) return;
