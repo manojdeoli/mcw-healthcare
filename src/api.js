@@ -442,25 +442,12 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         patientId: patientId,
         alert: 'INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness',
         esi: 'Level 2 (Emergency)',
-        vitals: 'Pulse 120, blood pressure 160/110, oxygen saturation 93%, body temperature 39.0',
-        complaint: 'Chest pain',
+        vitals: 'HR 120 bpm, BP 160/110 mmHg, SpO2 93%, Temp 37.2°C, irregular heart rhythm detected',
+        complaint: 'Acute chest pain with radiation to left arm',
         eta: 'Calculating...',
         medicalHistory: '',
         treatmentNeeds: { specialists: [], equipment: [] },
     });
-
-    // Fetch medical history after a few seconds
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    addMessage("Retrieving medical records from backend...");
-    setPatientMedicalDetails(prev => ({
-        ...prev,
-        medicalHistory: 'Hypertension (diagnosed 2018), Type 2 Diabetes (controlled), Previous MI (2020)',
-        treatmentNeeds: {
-            specialists: ['Cardiologist', 'Emergency Physician'],
-            equipment: ['Defibrillator', 'ECG', 'Cardiac Monitor', 'Oxygen Supply']
-        }
-    }));
-    addMessage("Medical history retrieved: Chronic conditions identified.");
 
     await new Promise(resolve => setTimeout(resolve, 2000));
     addMessage("Patient transport initiated.");
@@ -502,12 +489,37 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         addMessage(`ETA to hospital: ${etaString}`);
         
         let newVitals = null;
-        if (i === 2) {
-            newVitals = 'Pulse 115, blood pressure 155/105, oxygen saturation 94%, body temperature 38.8';
-            addMessage(`Paramedic update: Patient vitals improving - ${newVitals}`);
+        if (i === 1) {
+            addMessage("Paramedic analyzing vital signs and retrieving medical records...");
+            setPatientMedicalDetails(prev => ({
+                ...prev,
+                medicalHistory: 'Hypertension (diagnosed 2018), Type 2 Diabetes (controlled), Previous MI (2020)'
+            }));
+            addMessage("Medical history retrieved: Chronic conditions identified.");
+        } else if (i === 2) {
+            newVitals = 'HR 110 bpm, BP 155/105 mmHg, SpO2 95%, Temp 37.0°C, ST-segment elevation noted on ECG';
+            addMessage(`Paramedic update: Cardiac monitoring active - ${newVitals}`);
+            addMessage("Determining required specialists based on medical history...");
+            setPatientMedicalDetails(prev => ({
+                ...prev,
+                treatmentNeeds: {
+                    specialists: ['Cardiologist', 'Emergency Physician'],
+                    equipment: []
+                }
+            }));
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            addMessage("Identifying required equipment...");
+            setPatientMedicalDetails(prev => ({
+                ...prev,
+                treatmentNeeds: {
+                    ...prev.treatmentNeeds,
+                    equipment: ['Defibrillator', 'ECG', 'Cardiac Monitor', 'Oxygen Supply']
+                }
+            }));
+            addMessage("Treatment requirements transmitted to hospital.");
         } else if (i === 4) {
-            newVitals = 'Pulse 110, blood pressure 150/100, oxygen saturation 96%, body temperature 38.5';
-            addMessage(`Paramedic update: Patient stabilizing - ${newVitals}`);
+            newVitals = 'HR 105 bpm, BP 145/100 mmHg, SpO2 97%, Temp 36.9°C, chest pain reduced with nitroglycerin';
+            addMessage(`Paramedic update: Patient responding to treatment - ${newVitals}`);
         }
 
         setPatientMedicalDetails(prev => ({ ...prev, eta: etaString, ...(newVitals ? { vitals: newVitals } : {}) }));

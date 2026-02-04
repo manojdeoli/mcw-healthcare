@@ -381,6 +381,9 @@ function App() {
         case 'SET_USER_GPS':
           setUserGps(data);
           break;
+        case 'SET_SIMULATION_MODE':
+          setSimulationMode(data);
+          break;
         case 'SET_INITIAL_USER_LOCATION':
           setInitialUserLocation(data);
           break;
@@ -431,6 +434,7 @@ function App() {
 
   // Sync Wrappers
   const syncSetUserGps = (val) => { setUserGps(val); broadcast('SET_USER_GPS', val); };
+  const syncSetSimulationMode = (val) => { setSimulationMode(val); broadcast('SET_SIMULATION_MODE', val); };
   const syncSetPatientStatus = (val) => { setPatientStatus(val); broadcast('SET_PATIENT_STATUS', val); };
   const syncSetPaymentStatus = (val) => { setPaymentStatus(val); broadcast('SET_PAYMENT_STATUS', val); };
   const syncSetGeofencingSubscriptionId = (val) => { setGeofencingSubscriptionId(val); broadcast('SET_GEOFENCING_SUB_ID', val); };
@@ -496,7 +500,12 @@ function App() {
   const [formState, setFormState] = useState(
     formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {})
   );
-  const [additionalPatients, setAdditionalPatients] = useState([]);
+  const [additionalPatients, setAdditionalPatients] = useState([
+    { id: '847293561', name: 'Sarah Mitchell', symptoms: 'Moderate abdominal pain, nausea' },
+    { id: '923847102', name: 'James Rodriguez', symptoms: 'Minor laceration, stable' },
+    { id: '756482039', name: 'Emily Chen', symptoms: 'Fever, respiratory symptoms' },
+    { id: '681923745', name: 'Robert Thompson', symptoms: 'Ankle sprain, awaiting X-ray' }
+  ]);
   const [kioskWindow, setKioskWindow] = useState(null);
 
   const handleInputChange = (e) => {
@@ -772,16 +781,8 @@ function App() {
         syncSetLastIntegrityCheckTime(startTime);
       }
       syncSetArtificialTime(startTime);
-      setSimulationMode(mode);
+      syncSetSimulationMode(mode);
       if (mode === 'arrival') {
-        // Mock additional patients in the system
-        syncSetAdditionalPatients([
-          { id: '847293561', name: 'Sarah Mitchell', symptoms: 'Moderate abdominal pain, nausea' },
-          { id: '923847102', name: 'James Rodriguez', symptoms: 'Minor laceration, stable' },
-          { id: '756482039', name: 'Emily Chen', symptoms: 'Fever, respiratory symptoms' },
-          { id: '681923745', name: 'Robert Thompson', symptoms: 'Ankle sprain, awaiting X-ray' }
-        ]);
-
         setIsLoading(true);
         // Fetch actual hotel location
         const hospitalLocationData = await api.locationRetrieval(phone);
@@ -862,7 +863,7 @@ function App() {
           syncSetArtificialTime(null);
           setPhone('');
           setSuccess('');
-          setSimulationMode('arrival');
+          syncSetSimulationMode('arrival');
         }, 15000);
       }
     } catch (error) { // eslint-disable-line no-empty
@@ -939,6 +940,12 @@ function App() {
 
     const doc = kioskWindow.document;
     
+    // Send icon URLs to kiosk
+    broadcast('SET_ICON_URLS', {
+      ambulance: ambulanceIconPng,
+      patient: patientIconPng
+    });
+    
     // Only write the HTML structure once
     if (!doc.getElementById('kiosk-content')) {
       doc.open();
@@ -948,6 +955,7 @@ function App() {
         <head>
           <title>Emergency Room Kiosk</title>
           <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
           <style>
             body {
               margin: 0;
@@ -987,13 +995,17 @@ function App() {
             .alert-success { background: #d4edda; color: #155724; }
             .alert-danger { background: #f8d7da; color: #721c24; }
             .additional-patients-scroll { max-height: 80px; overflow-y: auto; }
+            #kiosk-map { height: 220px; width: 100%; border: 1px solid #ddd; border-radius: 3px; }
           </style>
         </head>
         <body>
           <div class="kiosk-container" id="kiosk-content"></div>
+          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script>
             const channel = new BroadcastChannel('healthcare_demo_sync_v2');
-            let state = {};
+            let state = { ambulanceIcon: null, patientIcon: null };
+            let map = null;
+            let markers = [];
             
             channel.onmessage = (event) => {
               const { type, data } = event.data;
@@ -1006,7 +1018,11 @@ function App() {
                 case 'SET_MEDICAL_DETAILS': state.patientMedicalDetails = data; break;
                 case 'SET_ADDITIONAL_PATIENTS': state.additionalPatients = data; break;
                 case 'SET_FORM_STATE': state.formState = data; break;
-                case 'KIOSK_UPDATE': state = { ...state, ...data }; break;
+                case 'SET_USER_GPS': state.userGps = data; updateMap(); break;
+                case 'SET_HOSPITAL_LOCATION': state.hospitalLocation = data; updateMap(); break;
+                case 'SET_SIMULATION_MODE': state.simulationMode = data; updateMap(); break;
+                case 'SET_ICON_URLS': state.ambulanceIcon = data.ambulance; state.patientIcon = data.patient; updateMap(); break;
+                case 'KIOSK_UPDATE': state = { ...state, ...data }; updateMap(); break;
               }
               render();
             };
@@ -1023,60 +1039,215 @@ function App() {
                 return;
               }
               
-              const html = '<div style="display: flex; gap: 20px; flex-wrap: wrap;">' +
-                '<div style="flex: 1; min-width: 300px;">' +
-                  '<div class="card">' +
-                    '<h2 class="card-header">1. Phone Verification</h2>' +
-                    '<div class="p-3">' +
-                      (s.verifiedPhoneNumber ? '<div style="font-size: 0.75em;">✓ Phone verified</div>' : '<div style="font-size: 0.75em;">⚠ Not verified</div>') +
+              const mapExists = document.getElementById('kiosk-map');
+              
+              if (!mapExists) {
+                const html = '<div style="display: flex; gap: 20px; flex-wrap: wrap;">' +
+                  '<div style="flex: 1; min-width: 300px;">' +
+                    '<div class="card">' +
+                      '<h2 class="card-header">1. Patient Status</h2>' +
+                      '<ul class="details-list" id="patient-status-list">' +
+                        '<li><strong>Identity Integrity:</strong> <span style="color: ' + (s.identityIntegrity === 'Good' ? 'green' : (s.identityIntegrity === 'Bad' ? 'red' : 'black')) + '">' + (s.identityIntegrity || 'Bad') + '</span></li>' +
+                        '<li><strong>Registration Status:</strong> <span style="color: ' + (s.registrationStatus === 'Registered' ? 'green' : 'red') + '">' + (s.registrationStatus || 'Not Registered') + '</span></li>' +
+                        '<li id="patient-status-line"><strong>Patient Status:</strong> <span style="color: ' + (s.patientStatus === 'Checked In' ? 'green' : 'red') + '">' + (s.patientStatus || 'Not Checked In') + '</span>' + (s.patientStatus === 'Awaiting Check-in' ? ' <button class="btn btn-success" onclick="completeCheckIn()" style="margin-left: 5px;">Complete Check-in</button>' : '') + '</li>' +
+                    '</div>' +
+                    '<div class="card">' +
+                      '<h2 class="card-header">2. Patient Personal Details</h2>' +
+                      '<div class="p-3" id="personal-details">' +
+                        '<div><strong>Name:</strong> ' + (s.formState?.name || 'N/A') + '</div>' +
+                        '<div><strong>Email:</strong> ' + (s.formState?.email || 'N/A') + '</div>' +
+                        '<div><strong>Address:</strong> ' + (s.formState?.address || 'N/A') + '</div>' +
+                        '<div><strong>Birthdate:</strong> ' + (s.formState?.birthdate || 'N/A') + '</div>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div class="card">' +
+                      '<h2 class="card-header">3. Location Tracker</h2>' +
+                      '<div class="p-3"><div id="kiosk-map"></div></div>' +
                     '</div>' +
                   '</div>' +
-                  '<div class="card">' +
-                    '<h2 class="card-header">2. Patient Status</h2>' +
-                    '<ul class="details-list">' +
-                      '<li><strong>Identity Integrity:</strong> <span style="color: ' + (s.identityIntegrity === 'Good' ? 'green' : (s.identityIntegrity === 'Bad' ? 'red' : 'black')) + '">' + (s.identityIntegrity || 'Bad') + '</span></li>' +
-                      '<li><strong>Registration Status:</strong> <span style="color: ' + (s.registrationStatus === 'Registered' ? 'green' : 'red') + '">' + (s.registrationStatus || 'Not Registered') + '</span></li>' +
-                      '<li><strong>Patient Status:</strong> <span style="color: ' + (s.patientStatus === 'Checked In' ? 'green' : 'red') + '">' + (s.patientStatus || 'Not Checked In') + '</span>' + (s.patientStatus === 'Awaiting Check-in' ? ' <button class="btn btn-success" onclick="completeCheckIn()" style="margin-left: 5px;">Complete Check-in</button>' : '') + '</li>' +
-                  '</div>' +
-                  '<div class="card">' +
-                    '<h2 class="card-header">3. Patient Personal Details</h2>' +
-                    '<div class="p-3">' +
-                      '<div><strong>Name:</strong> ' + (s.formState?.name || 'N/A') + '</div>' +
-                      '<div><strong>Email:</strong> ' + (s.formState?.email || 'N/A') + '</div>' +
-                      '<div><strong>Address:</strong> ' + (s.formState?.address || 'N/A') + '</div>' +
-                      '<div><strong>Birthdate:</strong> ' + (s.formState?.birthdate || 'N/A') + '</div>' +
+                  '<div style="flex: 1; min-width: 300px;">' +
+                    '<div class="card">' +
+                      '<h2 class="card-header">4. Patient Medical Details</h2>' +
+                      '<ul class="details-list" id="medical-details-list">' +
+                        (s.patientMedicalDetails?.alert ? '<li style="background: #fff3cd; padding: 4px 6px; margin-bottom: 4px; border-radius: 2px; font-size: 0.8em; color: #856404;">' + s.patientMedicalDetails.alert + '</li>' : '') +
+                        '<li><strong>Patient ID:</strong> ' + (s.patientMedicalDetails?.patientId || 'N/A') + '</li>' +
+                        '<li><strong>Emergency Severity Index:</strong> ' + (s.patientMedicalDetails?.esi || 'N/A') + '</li>' +
+                        '<li><strong>Vital signs:</strong> ' + (s.patientMedicalDetails?.vitals || 'N/A') + '</li>' +
+                        '<li><strong>Chief Complaint:</strong> ' + (s.patientMedicalDetails?.complaint || 'N/A') + '</li>' +
+                        '<li><strong>ETA:</strong> ' + (s.patientMedicalDetails?.eta || 'N/A') + '</li>' +
+                        (s.patientMedicalDetails?.medicalHistory ? '<li><strong>Medical History:</strong> ' + s.patientMedicalDetails.medicalHistory + '</li>' : '') +
+                        (s.patientMedicalDetails?.treatmentNeeds?.specialists?.length > 0 ? '<li><strong>Specialists Required:</strong> ' + s.patientMedicalDetails.treatmentNeeds.specialists.join(', ') + '</li>' : '') +
+                        (s.patientMedicalDetails?.treatmentNeeds?.equipment?.length > 0 ? '<li><strong>Equipment Needed:</strong> ' + s.patientMedicalDetails.treatmentNeeds.equipment.join(', ') + '</li>' : '') +
+                      '</ul>' +
+                    '</div>' +
+                    (s.additionalPatients?.length > 0 ? '<div class="card" id="additional-patients-card"><h2 class="card-header">Additional Patients</h2><div class="p-3 additional-patients-scroll" id="additional-patients-list">' + s.additionalPatients.map(p => '<div style="padding: 5px; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 3px; background: #f9f9f9; font-size: 0.75em;"><div><strong>' + p.name + '</strong> (ID: ' + p.id + ')</div><div style="font-size: 0.9em; color: #666;">' + p.symptoms + '</div></div>').join('') + '</div></div>' : '') +
+                    '<div class="card">' +
+                      '<h2 class="card-header">5. Outpatient Monitoring</h2>' +
+                      '<ul class="details-list" id="outpatient-status-list">' +
+                        '<li><strong>Status:</strong> <span style="color: ' + (s.outpatientStatus?.includes('Anomaly') ? 'red' : (s.outpatientStatus === 'Inactive' ? 'black' : 'green')) + '">' + (s.outpatientStatus || 'Inactive') + '</span></li>' +
+                      '</ul>' +
                     '</div>' +
                   '</div>' +
-                '</div>' +
-                '<div style="flex: 1; min-width: 300px;">' +
-                  '<div class="card">' +
-                    '<h2 class="card-header">4. Patient Medical Details</h2>' +
-                    '<ul class="details-list">' +
-                      (s.patientMedicalDetails?.alert ? '<li style="background: #fff3cd; padding: 4px 6px; margin-bottom: 4px; border-radius: 2px; font-size: 0.8em; color: #856404;">' + s.patientMedicalDetails.alert + '</li>' : '') +
-                      '<li><strong>Patient ID:</strong> ' + (s.patientMedicalDetails?.patientId || 'N/A') + '</li>' +
-                      '<li><strong>Emergency Severity Index:</strong> ' + (s.patientMedicalDetails?.esi || 'N/A') + '</li>' +
-                      '<li><strong>Vital signs:</strong> ' + (s.patientMedicalDetails?.vitals || 'N/A') + '</li>' +
-                      '<li><strong>Chief Complaint:</strong> ' + (s.patientMedicalDetails?.complaint || 'N/A') + '</li>' +
-                      '<li><strong>ETA:</strong> ' + (s.patientMedicalDetails?.eta || 'N/A') + '</li>' +
-                      (s.patientMedicalDetails?.medicalHistory ? '<li><strong>Medical History:</strong> ' + s.patientMedicalDetails.medicalHistory + '</li>' : '') +
-                      (s.patientMedicalDetails?.treatmentNeeds?.specialists?.length > 0 ? '<li><strong>Specialists Required:</strong> ' + s.patientMedicalDetails.treatmentNeeds.specialists.join(', ') + '</li>' : '') +
-                      (s.patientMedicalDetails?.treatmentNeeds?.equipment?.length > 0 ? '<li><strong>Equipment Needed:</strong> ' + s.patientMedicalDetails.treatmentNeeds.equipment.join(', ') + '</li>' : '') +
-                    '</ul>' +
-                  '</div>' +
-                  (s.additionalPatients?.length > 0 ? '<div class="card"><h2 class="card-header">Additional Patients</h2><div class="p-3 additional-patients-scroll">' + s.additionalPatients.map(p => '<div style="padding: 5px; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 3px; background: #f9f9f9; font-size: 0.75em;"><div><strong>' + p.name + '</strong> (ID: ' + p.id + ')</div><div style="font-size: 0.9em; color: #666;">' + p.symptoms + '</div></div>').join('') + '</div></div>' : '') +
-                  '<div class="card">' +
-                    '<h2 class="card-header">5. Outpatient Monitoring</h2>' +
-                    '<ul class="details-list">' +
-                      '<li><strong>Status:</strong> <span style="color: ' + (s.outpatientStatus?.includes('Anomaly') ? 'red' : (s.outpatientStatus === 'Inactive' ? 'black' : 'green')) + '">' + (s.outpatientStatus || 'Inactive') + '</span></li>' +
-                    '</ul>' +
-                  '</div>' +
-                '</div>' +
-              '</div>';
-              content.innerHTML = html;
+                '</div>';
+                content.innerHTML = html;
+                initMap();
+              } else {
+                // Update only text content
+                const patientStatusList = document.getElementById('patient-status-list');
+                if (patientStatusList) patientStatusList.innerHTML = '<li><strong>Identity Integrity:</strong> <span style="color: ' + (s.identityIntegrity === 'Good' ? 'green' : (s.identityIntegrity === 'Bad' ? 'red' : 'black')) + '">' + (s.identityIntegrity || 'Bad') + '</span></li>' +
+                  '<li><strong>Registration Status:</strong> <span style="color: ' + (s.registrationStatus === 'Registered' ? 'green' : 'red') + '">' + (s.registrationStatus || 'Not Registered') + '</span></li>' +
+                  '<li id="patient-status-line"><strong>Patient Status:</strong> <span style="color: ' + (s.patientStatus === 'Checked In' ? 'green' : 'red') + '">' + (s.patientStatus || 'Not Checked In') + '</span>' + (s.patientStatus === 'Awaiting Check-in' ? ' <button class="btn btn-success" onclick="completeCheckIn()" style="margin-left: 5px;">Complete Check-in</button>' : '') + '</li>';
+                
+                const personalDetails = document.getElementById('personal-details');
+                if (personalDetails) personalDetails.innerHTML = '<div><strong>Name:</strong> ' + (s.formState?.name || 'N/A') + '</div>' +
+                  '<div><strong>Email:</strong> ' + (s.formState?.email || 'N/A') + '</div>' +
+                  '<div><strong>Address:</strong> ' + (s.formState?.address || 'N/A') + '</div>' +
+                  '<div><strong>Birthdate:</strong> ' + (s.formState?.birthdate || 'N/A') + '</div>';
+                
+                const medicalDetailsList = document.getElementById('medical-details-list');
+                if (medicalDetailsList) medicalDetailsList.innerHTML = (s.patientMedicalDetails?.alert ? '<li style="background: #fff3cd; padding: 4px 6px; margin-bottom: 4px; border-radius: 2px; font-size: 0.8em; color: #856404;">' + s.patientMedicalDetails.alert + '</li>' : '') +
+                  '<li><strong>Patient ID:</strong> ' + (s.patientMedicalDetails?.patientId || 'N/A') + '</li>' +
+                  '<li><strong>Emergency Severity Index:</strong> ' + (s.patientMedicalDetails?.esi || 'N/A') + '</li>' +
+                  '<li><strong>Vital signs:</strong> ' + (s.patientMedicalDetails?.vitals || 'N/A') + '</li>' +
+                  '<li><strong>Chief Complaint:</strong> ' + (s.patientMedicalDetails?.complaint || 'N/A') + '</li>' +
+                  '<li><strong>ETA:</strong> ' + (s.patientMedicalDetails?.eta || 'N/A') + '</li>' +
+                  (s.patientMedicalDetails?.medicalHistory ? '<li><strong>Medical History:</strong> ' + s.patientMedicalDetails.medicalHistory + '</li>' : '') +
+                  (s.patientMedicalDetails?.treatmentNeeds?.specialists?.length > 0 ? '<li><strong>Specialists Required:</strong> ' + s.patientMedicalDetails.treatmentNeeds.specialists.join(', ') + '</li>' : '') +
+                  (s.patientMedicalDetails?.treatmentNeeds?.equipment?.length > 0 ? '<li><strong>Equipment Needed:</strong> ' + s.patientMedicalDetails.treatmentNeeds.equipment.join(', ') + '</li>' : '');
+                
+                const outpatientStatusList = document.getElementById('outpatient-status-list');
+                if (outpatientStatusList) outpatientStatusList.innerHTML = '<li><strong>Status:</strong> <span style="color: ' + (s.outpatientStatus?.includes('Anomaly') ? 'red' : (s.outpatientStatus === 'Inactive' ? 'black' : 'green')) + '">' + (s.outpatientStatus || 'Inactive') + '</span></li>';
+                
+                const additionalPatientsCard = document.getElementById('additional-patients-card');
+                if (s.additionalPatients?.length > 0) {
+                  if (!additionalPatientsCard) {
+                    const medicalCard = document.querySelector('.card:has(#medical-details-list)');
+                    if (medicalCard) {
+                      const newCard = document.createElement('div');
+                      newCard.id = 'additional-patients-card';
+                      newCard.className = 'card';
+                      newCard.innerHTML = '<h2 class="card-header">Additional Patients</h2><div class="p-3 additional-patients-scroll" id="additional-patients-list"></div>';
+                      medicalCard.parentNode.insertBefore(newCard, medicalCard.nextSibling);
+                    }
+                  }
+                  const additionalPatientsList = document.getElementById('additional-patients-list');
+                  if (additionalPatientsList) {
+                    additionalPatientsList.innerHTML = s.additionalPatients.map(p => '<div style="padding: 5px; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 3px; background: #f9f9f9; font-size: 0.75em;"><div><strong>' + p.name + '</strong> (ID: ' + p.id + ')</div><div style="font-size: 0.9em; color: #666;">' + p.symptoms + '</div></div>').join('');
+                  }
+                } else if (additionalPatientsCard) {
+                  additionalPatientsCard.remove();
+                }
+                
+                updateMap();
+              }
             }
             
             function completeCheckIn() {
               channel.postMessage({ type: 'COMPLETE_CHECKIN' });
+            }
+            
+            function initMap() {
+              if (!map && document.getElementById('kiosk-map')) {
+                try {
+                  map = L.map('kiosk-map').setView([-33.8688, 151.2093], 12);
+                  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap'
+                  }).addTo(map);
+                  setTimeout(() => map.invalidateSize(), 100);
+                } catch(e) {
+                  console.error('Map init error:', e);
+                }
+              }
+            }
+            
+            function updateMap() {
+              if (!map) initMap();
+              if (!map) return;
+              
+              markers.forEach(m => {
+                try { map.removeLayer(m); } catch(e) {}
+              });
+              markers = [];
+              
+              const s = state;
+              
+              if (s.hospitalLocation) {
+                const hospitalIcon = L.divIcon({
+                  html: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#FF0000" width="32px" height="32px"><path d="M18 13h-5v5h-2v-5H6v-2h5V6h2v5h5v2z"/><path d="M0 0h24v24H0z" fill="none"/></svg>',
+                  className: 'hospital-location-icon',
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 32],
+                  popupAnchor: [0, -32]
+                });
+                const hospitalMarker = L.marker([s.hospitalLocation.lat, s.hospitalLocation.lng], { icon: hospitalIcon }).addTo(map);
+                hospitalMarker.bindPopup('Wellsoon Hospital');
+                markers.push(hospitalMarker);
+                
+                const circle = L.circle([s.hospitalLocation.lat, s.hospitalLocation.lng], {
+                  color: 'red',
+                  fillColor: '#ff0000',
+                  fillOpacity: 0.2,
+                  radius: 100
+                }).addTo(map);
+                circle.bindPopup('Hospital Check-in Area');
+                markers.push(circle);
+                
+                if (!s.userGps) {
+                  map.setView([s.hospitalLocation.lat, s.hospitalLocation.lng], 13);
+                }
+              }
+              
+              if (s.userGps && s.hospitalLocation) {
+                let iconUrl = s.ambulanceIcon;
+                if (s.simulationMode === 'departure' && s.patientIcon) {
+                  iconUrl = s.patientIcon;
+                }
+                
+                const userIcon = iconUrl ? L.icon({
+                  iconUrl: iconUrl,
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 32],
+                  popupAnchor: [0, -32]
+                }) : L.icon({
+                  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                  iconSize: [25, 41],
+                  iconAnchor: [12, 41]
+                });
+                
+                const userMarker = L.marker([s.userGps.lat, s.userGps.lng], { icon: userIcon }).addTo(map);
+                userMarker.bindPopup('User Location');
+                markers.push(userMarker);
+                
+                function getDistance(coords1, coords2) {
+                  const R = 6371e3;
+                  const φ1 = coords1.lat * Math.PI / 180;
+                  const φ2 = coords2.lat * Math.PI / 180;
+                  const Δφ = (coords2.lat - coords1.lat) * Math.PI / 180;
+                  const Δλ = (coords2.lng - coords1.lng) * Math.PI / 180;
+                  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return R * c;
+                }
+                
+                const distance = getDistance(s.userGps, s.hospitalLocation);
+                const ZOOM_START_RADIUS = 2000;
+                const MIN_ZOOM = 12;
+                const MAX_ZOOM = 18;
+                
+                let newZoom;
+                if (distance >= ZOOM_START_RADIUS) {
+                  newZoom = MIN_ZOOM;
+                } else {
+                  const zoomProgress = 1 - (distance / ZOOM_START_RADIUS);
+                  newZoom = MIN_ZOOM + (MAX_ZOOM - MIN_ZOOM) * zoomProgress;
+                }
+                
+                const midLat = (s.userGps.lat + s.hospitalLocation.lat) / 2;
+                const midLng = (s.userGps.lng + s.hospitalLocation.lng) / 2;
+                map.setView([midLat, midLng], newZoom, { animate: true, pan: { duration: 2.5 } });
+              }
+              
+              setTimeout(() => map.invalidateSize(), 50);
             }
           </script>
         </body>
@@ -1095,9 +1266,12 @@ function App() {
       outpatientStatus,
       formState,
       patientMedicalDetails,
-      additionalPatients
+      additionalPatients,
+      userGps,
+      hospitalLocation,
+      simulationMode
     });
-  }, [kioskWindow, phone, verifiedPhoneNumber, identityIntegrity, registrationStatus, patientStatus, formState, patientMedicalDetails, additionalPatients, outpatientStatus]);
+  }, [kioskWindow, phone, verifiedPhoneNumber, identityIntegrity, registrationStatus, patientStatus, formState, patientMedicalDetails, additionalPatients, outpatientStatus, userGps, hospitalLocation, simulationMode]);
 
   return (
     <div className="App">
@@ -1115,9 +1289,9 @@ function App() {
       </header>
 
       <nav className="screen-nav" style={{ background: '#f0f0f0', padding: '10px', textAlign: 'center', marginBottom: '20px' }}>
-        <button className={`btn ${activeScreen === 1 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(1)}>1. API Interactions</button>
-        <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(2)}>2. Hospital Dashboard</button>
-        <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>3. All Details</button>
+        <button className={`btn ${activeScreen === 1 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(1)}>Network API Interactions</button>
+        <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px', display: 'none' }} onClick={() => setActiveScreen(2)}>Hospital Dashboard</button>
+        <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>Admin Console</button>
         <button className="btn btn-success" style={{ margin: '0 5px' }} onClick={openKioskDisplay}>🏥 Open ER Kiosk Display</button>
       </nav>
 
