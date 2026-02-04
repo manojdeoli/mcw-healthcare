@@ -11,7 +11,7 @@ import authService from './auth';
 import { formFields, generatePatientId } from './formFields';
 import ambulanceIconPng from './ambulance.png';
 import patientIconPng from './patient.png';
-import emergencyRoomBg from './emergency1.png';
+import emergencyRoomBg from './emergency2.png';
 
 
 // --- Fix for Leaflet's default icon ---
@@ -958,37 +958,35 @@ function App() {
               overflow: hidden;
               font-weight: 600;
               color: #000;
+              font-size: 0.7em;
             }
             .kiosk-container {
               position: absolute;
-              top: 60%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              width: 90%;
-              height: 90%;
-              background: rgba(255, 255, 255, 0.7);
-              border: 8px solid #333;
-              border-radius: 10px;
-              box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+              top: 0;
+              left: 3%;
+              width: 60%;
+              height: 100%;
               overflow-y: auto;
               padding: 20px;
+              text-align: left;
             }
-            .card { margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; }
-            .card-header { background: #007bff; color: white; padding: 8px 12px; font-weight: bold; border-radius: 5px 5px 0 0; font-size: 0.9em; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
-            .details-list { list-style: none; padding: 12px; margin: 0; font-size: 0.9em; font-weight: 600; }
-            .details-list li { padding: 6px 0; border-bottom: 1px solid #eee; }
+            .card { margin-bottom: 5px; border: 1px solid #ddd; border-radius: 3px; }
+            .card-header { background: #007bff; color: white; padding: 3px 6px; font-weight: bold; border-radius: 3px 3px 0 0; font-size: 0.85em; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+            .details-list { list-style: none; padding: 5px; margin: 0; font-size: 0.8em; font-weight: 600; }
+            .details-list li { padding: 2px 0; border-bottom: 1px solid #eee; }
             .details-list li:last-child { border-bottom: none; }
-            .p-3 { padding: 12px; font-size: 0.9em; font-weight: 600; }
-            .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+            .p-3 { padding: 5px; font-size: 0.8em; font-weight: 600; }
+            .btn { padding: 4px 8px; margin: 2px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em; }
             .btn-primary { background: #007bff; color: white; }
             .btn-success { background: #28a745; color: white; }
             .api-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
             .form-control { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
             .verify-form-container { display: flex; gap: 10px; align-items: center; }
-            .alert { padding: 10px; margin: 10px 0; border-radius: 4px; }
+            .alert { padding: 3px 5px; margin: 3px 0; border-radius: 3px; font-size: 0.75em; }
             .alert-info { background: #d1ecf1; color: #0c5460; }
             .alert-success { background: #d4edda; color: #155724; }
             .alert-danger { background: #f8d7da; color: #721c24; }
+            .additional-patients-scroll { max-height: 80px; overflow-y: auto; }
           </style>
         </head>
         <body>
@@ -1030,10 +1028,7 @@ function App() {
                   '<div class="card">' +
                     '<h2 class="card-header">1. Phone Verification</h2>' +
                     '<div class="p-3">' +
-                      '<div style="padding: 8px; background: #f8f9fa; border-radius: 4px;">' +
-                        '<strong>Phone:</strong> ' + (s.phone || 'Not entered') +
-                      '</div>' +
-                      (s.verifiedPhoneNumber ? '<div class="alert alert-success" style="margin-top: 10px;">✓ Phone verified</div>' : '<div class="alert alert-info" style="margin-top: 10px;">⚠ Not verified</div>') +
+                      (s.verifiedPhoneNumber ? '<div style="font-size: 0.75em;">✓ Phone verified</div>' : '<div style="font-size: 0.75em;">⚠ Not verified</div>') +
                     '</div>' +
                   '</div>' +
                   '<div class="card">' +
@@ -1041,9 +1036,7 @@ function App() {
                     '<ul class="details-list">' +
                       '<li><strong>Identity Integrity:</strong> <span style="color: ' + (s.identityIntegrity === 'Good' ? 'green' : (s.identityIntegrity === 'Bad' ? 'red' : 'black')) + '">' + (s.identityIntegrity || 'Bad') + '</span></li>' +
                       '<li><strong>Registration Status:</strong> <span style="color: ' + (s.registrationStatus === 'Registered' ? 'green' : 'red') + '">' + (s.registrationStatus || 'Not Registered') + '</span></li>' +
-                      '<li><strong>Patient Status:</strong> <span style="color: ' + (s.patientStatus === 'Checked In' ? 'green' : 'red') + '">' + (s.patientStatus || 'Not Checked In') + '</span></li>' +
-                    '</ul>' +
-                    (s.patientStatus === 'Awaiting Check-in' ? '<div class="p-3"><button class="btn btn-success" onclick="completeCheckIn()">Complete Check-in</button></div>' : '') +
+                      '<li><strong>Patient Status:</strong> <span style="color: ' + (s.patientStatus === 'Checked In' ? 'green' : 'red') + '">' + (s.patientStatus || 'Not Checked In') + '</span>' + (s.patientStatus === 'Awaiting Check-in' ? ' <button class="btn btn-success" onclick="completeCheckIn()" style="margin-left: 5px;">Complete Check-in</button>' : '') + '</li>' +
                   '</div>' +
                   '<div class="card">' +
                     '<h2 class="card-header">3. Patient Personal Details</h2>' +
@@ -1070,7 +1063,7 @@ function App() {
                       (s.patientMedicalDetails?.treatmentNeeds?.equipment?.length > 0 ? '<li><strong>Equipment Needed:</strong> ' + s.patientMedicalDetails.treatmentNeeds.equipment.join(', ') + '</li>' : '') +
                     '</ul>' +
                   '</div>' +
-                  (s.additionalPatients?.length > 0 ? '<div class="card"><h2 class="card-header">Additional Patients</h2><div class="p-3">' + s.additionalPatients.map(p => '<div style="padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;"><div><strong>' + p.name + '</strong> (ID: ' + p.id + ')</div><div style="font-size: 0.9em; color: #666;">' + p.symptoms + '</div></div>').join('') + '</div></div>' : '') +
+                  (s.additionalPatients?.length > 0 ? '<div class="card"><h2 class="card-header">Additional Patients</h2><div class="p-3 additional-patients-scroll">' + s.additionalPatients.map(p => '<div style="padding: 5px; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 3px; background: #f9f9f9; font-size: 0.75em;"><div><strong>' + p.name + '</strong> (ID: ' + p.id + ')</div><div style="font-size: 0.9em; color: #666;">' + p.symptoms + '</div></div>').join('') + '</div></div>' : '') +
                   '<div class="card">' +
                     '<h2 class="card-header">5. Outpatient Monitoring</h2>' +
                     '<ul class="details-list">' +
