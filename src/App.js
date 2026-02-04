@@ -955,9 +955,9 @@ function App() {
               background-size: cover;
               font-family: Arial, sans-serif;
               overflow: hidden;
-              font-weight: 600;
-              color: #000;
-              font-size: 0.7em;
+              font-weight: 700;
+              color: #1a1a1a;
+              font-size: 0.75em;
             }
             .kiosk-container {
               position: absolute;
@@ -971,10 +971,10 @@ function App() {
             }
             .card { margin-bottom: 5px; border: 1px solid #ddd; border-radius: 3px; }
             .card-header { background: #007bff; color: white; padding: 3px 6px; font-weight: bold; border-radius: 3px 3px 0 0; font-size: 0.85em; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
-            .details-list { list-style: none; padding: 5px; margin: 0; font-size: 0.8em; font-weight: 600; }
+            .details-list { list-style: none; padding: 5px; margin: 0; font-size: 0.85em; font-weight: 700; color: #1a1a1a; }
             .details-list li { padding: 2px 0; border-bottom: 1px solid #eee; }
             .details-list li:last-child { border-bottom: none; }
-            .p-3 { padding: 5px; font-size: 0.8em; font-weight: 600; }
+            .p-3 { padding: 5px; font-size: 0.85em; font-weight: 700; color: #1a1a1a; }
             .btn { padding: 4px 8px; margin: 2px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85em; }
             .btn-primary { background: #007bff; color: white; }
             .btn-success { background: #28a745; color: white; }
@@ -1060,7 +1060,7 @@ function App() {
                     '<div class="card">' +
                       '<h2 class="card-header">4. Patient Medical Details</h2>' +
                       '<ul class="details-list" id="medical-details-list">' +
-                        (s.patientMedicalDetails?.alert ? '<li style="background: #fff3cd; padding: 4px 6px; margin-bottom: 4px; border-radius: 2px; font-size: 0.8em; color: #856404;">' + s.patientMedicalDetails.alert + '</li>' : '') +
+                        (s.patientMedicalDetails?.alert ? '<li style="background: #dc3545; padding: 4px 6px; margin-bottom: 4px; border-radius: 3px; font-size: 0.75em; color: #ffffff; font-weight: 700; border: 2px solid #c82333;">' + s.patientMedicalDetails.alert + '</li>' : '') +
                         '<li><strong>Patient ID:</strong> ' + (s.patientMedicalDetails?.patientId || 'N/A') + '</li>' +
                         '<li><strong>Emergency Severity Index:</strong> ' + (s.patientMedicalDetails?.esi || 'N/A') + '</li>' +
                         '<li><strong>Vital signs:</strong> ' + (s.patientMedicalDetails?.vitals || 'N/A') + '</li>' +
@@ -1096,7 +1096,7 @@ function App() {
                   '<div><strong>Birthdate:</strong> ' + (s.formState?.birthdate || 'N/A') + '</div>';
                 
                 const medicalDetailsList = document.getElementById('medical-details-list');
-                if (medicalDetailsList) medicalDetailsList.innerHTML = (s.patientMedicalDetails?.alert ? '<li style="background: #fff3cd; padding: 4px 6px; margin-bottom: 4px; border-radius: 2px; font-size: 0.8em; color: #856404;">' + s.patientMedicalDetails.alert + '</li>' : '') +
+                if (medicalDetailsList) medicalDetailsList.innerHTML = (s.patientMedicalDetails?.alert ? '<li style="background: #dc3545; padding: 4px 6px; margin-bottom: 4px; border-radius: 3px; font-size: 0.75em; color: #ffffff; font-weight: 700; border: 2px solid #c82333;">' + s.patientMedicalDetails.alert + '</li>' : '') +
                   '<li><strong>Patient ID:</strong> ' + (s.patientMedicalDetails?.patientId || 'N/A') + '</li>' +
                   '<li><strong>Emergency Severity Index:</strong> ' + (s.patientMedicalDetails?.esi || 'N/A') + '</li>' +
                   '<li><strong>Vital signs:</strong> ' + (s.patientMedicalDetails?.vitals || 'N/A') + '</li>' +
@@ -1401,7 +1401,7 @@ function App() {
                   <div id="medicalDetails" className="card">
                     <h2 className="card-header">4. Patient Medical Details</h2>
                     <ul className="details-list">
-                      {patientMedicalDetails.alert && <li style={{ background: '#fff3cd', padding: '4px 6px', marginBottom: '4px', borderRadius: '2px', fontSize: '0.8em', color: '#856404' }}>{patientMedicalDetails.alert}</li>}
+                      {patientMedicalDetails.alert && <li style={{ background: '#dc3545', padding: '4px 6px', marginBottom: '4px', borderRadius: '3px', fontSize: '0.75em', color: '#ffffff', fontWeight: '700', border: '2px solid #c82333' }}>{patientMedicalDetails.alert}</li>}
                       <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                       <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                       <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
@@ -1528,7 +1528,7 @@ function App() {
                 <div id="medicalDetails" className="card">
                   <h2 className="card-header">4. Patient Medical Details</h2>
                   <ul className="details-list">
-                    {patientMedicalDetails.alert && <li style={{ background: '#fff3cd', padding: '4px 6px', marginBottom: '4px', borderRadius: '2px', fontSize: '0.8em', color: '#856404' }}>{patientMedicalDetails.alert}</li>}
+                    {patientMedicalDetails.alert && <li style={{ background: '#dc3545', padding: '4px 6px', marginBottom: '4px', borderRadius: '3px', fontSize: '0.75em', color: '#ffffff', fontWeight: '700', border: '2px solid #c82333' }}>{patientMedicalDetails.alert}</li>}
                     <li><strong>Patient ID:</strong> <span>{patientMedicalDetails.patientId}</span></li>
                     <li><strong>Emergency Severity Index:</strong> <span>{patientMedicalDetails.esi}</span></li>
                     <li><strong>Vital signs:</strong> <span>{patientMedicalDetails.vitals}</span></li>
