@@ -537,7 +537,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         area: {
             areaType: "CIRCLE",
             center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng }, // Verify against hotel location
-            radius: 100 // As per Telstra's vicinity radius
+            radius: 100
         }
     };
 
