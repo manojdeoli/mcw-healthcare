@@ -1,0 +1,432 @@
+.er-dashboard {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.er-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+.er-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.er-content {
+  position: relative;
+  z-index: 1;
+  padding: 2rem;
+  color: white;
+}
+
+.er-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.er-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: white;
+}
+
+.er-stats {
+  display: flex;
+  gap: 2rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #00d4ff;
+}
+
+.er-main {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+}
+
+.patient-queue {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1.5rem;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.patient-queue h2 {
+  margin-top: 0;
+  color: white;
+  border-bottom: 2px solid #00d4ff;
+  padding-bottom: 0.5rem;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.patient-card {
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 5px solid;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.patient-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+}
+
+.patient-card.selected {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+  transform: scale(1.02);
+}
+
+/* Pulse animation for critical patients */
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 15px rgba(220, 53, 69, 0);
+  }
+}
+
+.patient-card.pulse-animation {
+  animation: pulse 2s infinite;
+  border-left-width: 6px !important;
+}
+
+/* Checked-in patient styling */
+.patient-card.checked-in {
+  background: rgba(23, 162, 184, 0.15);
+  border-left-color: #17A2B8 !important;
+}
+
+.patient-card.checked-in:hover {
+  background: rgba(23, 162, 184, 0.25);
+}
+
+/* Left AMA patient styling */
+.patient-card.left-ama {
+  background: rgba(255, 107, 53, 0.15);
+  border-left-color: #FF6B35 !important;
+}
+
+.patient-card.left-ama:hover {
+  background: rgba(255, 107, 53, 0.25);
+}
+
+.checkin-btn {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.checkin-btn:hover {
+  background: #218838;
+  transform: scale(1.02);
+}
+
+.checkin-btn-small {
+  padding: 0.25rem 0.5rem;
+  margin-left: 0.5rem;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checkin-btn-small:hover {
+  background: #218838;
+  transform: scale(1.05);
+}
+
+.checked-in-badge {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  background: #17A2B8;
+  color: white;
+  border-radius: 5px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.ai-summary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 0.75rem;
+  border-radius: 5px;
+  margin-top: 0.5rem;
+  color: white;
+  border-left: 4px solid #ffd700;
+}
+
+.ai-summary strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.ai-summary-content {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.ai-summary-content div {
+  margin-bottom: 0.5rem;
+}
+
+.ai-summary-content div:last-child {
+  margin-bottom: 0;
+}
+
+/* Smooth transitions */
+.patient-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.patient-card:hover {
+  transform: translateX(8px) scale(1.02);
+  box-shadow: 0 8px 16px rgba(0, 212, 255, 0.3);
+}
+
+/* Status badge animations */
+.status-badge {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ETA countdown highlight */
+.detail-row .eta {
+  animation: pulse-text 2s infinite;
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.patient-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.patient-info h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.patient-age {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.patient-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.detail-row .label {
+  color: #666;
+}
+
+.detail-row .value {
+  font-weight: 600;
+}
+
+.detail-row .eta {
+  color: #DC3545;
+  font-weight: bold;
+}
+
+.patient-complaint {
+  background: #f8f9fa;
+  padding: 0.5rem;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.patient-vitals {
+  background: #e3f2fd;
+  padding: 0.5rem;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  border-left: 3px solid #2196f3;
+}
+
+.er-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.map-panel {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1.5rem;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.map-panel h3 {
+  margin-top: 0;
+  color: white;
+  border-bottom: 2px solid #00d4ff;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.resource-panel, .alert-panel {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1.5rem;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.resource-panel h3, .alert-panel h3 {
+  margin-top: 0;
+  color: white;
+  border-bottom: 2px solid #00d4ff;
+  padding-bottom: 0.5rem;
+}
+
+.resource-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.resource-value {
+  font-weight: bold;
+}
+
+.resource-value.available {
+  color: #28a745;
+}
+
+.resource-value.limited {
+  color: #ffc107;
+}
+
+.alert-panel {
+  background: rgba(139, 0, 0, 0.3);
+}
+
+.alert-item {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.alert-item.critical {
+  background: rgba(220, 53, 69, 0.3);
+  border-left: 4px solid #DC3545;
+}
+
+.alert-item.urgent {
+  background: rgba(253, 126, 20, 0.3);
+  border-left: 4px solid #FD7E14;
+}
+
+.alert-item strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: white;
+}
+
+.alert-item p {
+  margin: 0.25rem 0;
+  color: #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.alert-action {
+  font-style: italic;
+  color: #ffd700 !important;
+}
+
+/* Hospital marker styling */
+.hospital-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+@media (max-width: 1200px) {
+  .er-main {
+    grid-template-columns: 1fr;
+  }
+}

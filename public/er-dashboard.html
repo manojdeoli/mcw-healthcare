@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ER Coordination Center</title>
+</head>
+<body>
+  <div id="er-root"></div>
+  <script type="module">
+    import React from 'react';
+    import ReactDOM from 'react-dom/client';
+    
+    // Load the ER Dashboard component
+    const loadDashboard = async () => {
+      try {
+        const module = await import('/src/er-dashboard-entry.js');
+      } catch (error) {
+        console.error('Failed to load ER Dashboard:', error);
+        document.getElementById('er-root').innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 1.5em; color: #666;">Loading ER Dashboard...</div>';
+      }
+    };
+    
+    loadDashboard();
+  </script>
+</body>
+</html>

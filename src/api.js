@@ -132,6 +132,37 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
   return d;
 }
 
+function generateAISummary(chiefComplaint) {
+    const complaint = chiefComplaint.toLowerCase();
+    
+    if (complaint.includes('chest') || complaint.includes('cardiac') || complaint.includes('heart')) {
+        return {
+            diagnosis: '🩺 Suspected Acute Coronary Syndrome (ACS) - Possible STEMI',
+            recommendedAction: '⚡ Immediate cardiac catheterization lab activation | Administer aspirin, nitroglycerin, and heparin | Continuous cardiac monitoring'
+        };
+    } else if (complaint.includes('abdominal') || complaint.includes('abdomen')) {
+        return {
+            diagnosis: '🫀 Suspected Acute Appendicitis',
+            recommendedAction: '💉 Surgical consult | NPO status | IV antibiotics | CT abdomen with contrast'
+        };
+    } else if (complaint.includes('fracture') || complaint.includes('broken')) {
+        return {
+            diagnosis: '🦴 Suspected Compound Fracture',
+            recommendedAction: '💊 Orthopedic consult | Pain management | X-ray imaging | Prepare for surgical reduction'
+        };
+    } else if (complaint.includes('laceration') || complaint.includes('cut') || complaint.includes('wound')) {
+        return {
+            diagnosis: '🩹 Deep Laceration Requiring Sutures',
+            recommendedAction: '🧵 Wound irrigation and debridement | Tetanus prophylaxis | Suture kit preparation'
+        };
+    } else {
+        return {
+            diagnosis: '💔 Acute Medical Emergency',
+            recommendedAction: '👨‍⚕️ Immediate physician assessment | Full vital signs monitoring | Prepare for diagnostic workup'
+        };
+    }
+}
+
 const mockKycData = {
     '61400500800': { name: 'Michael Jackson', address: '242 Exhibition St, Melbourne', birthdate: '1958-08-29', email: 'michael.hehe@gmail.com' },
     '61400500801': { name: 'Maria Fernanda González', address: '12 Collins St, Melbourne VIC 3000', birthdate: '1968-02-08', email: 'gonzalez02081968@example.com' },
@@ -280,44 +311,13 @@ export function obscureKycRequest(data) {
 }
 
 export function locationRetrieval(phoneNumber, mockCoordinates) {
+    // Use real API to showcase Network API capabilities
     return post('https://network-as-code.p-eu.rapidapi.com/location-retrieval/v0/retrieve', {
         device: {
             phoneNumber
         },
         maxAge: 60
     });
-    // This endpoint seems to be outside the CAMARA passthrough and requires its own headers
-    /* return axios.post('https://network-as-code.p-eu.rapidapi.com/location-retrieval/v0/retrieve', {
-        device: {
-            phoneNumber
-        }
-    }, {
-        headers: defaultHeaders
-    }).then(response => response.data); */
-    /* return new Promise(resolve => {
-        setTimeout(() => {
-            let center;
-            if (mockCoordinates) {
-                center = {
-                    latitude: mockCoordinates.lat || mockCoordinates.latitude,
-                    longitude: mockCoordinates.lng || mockCoordinates.longitude
-                };
-            } else {
-                center = {
-                    latitude: 41.355633,
-                    longitude: 2.127911
-                };
-            }
-            resolve({
-                lastLocationTime: new Date().toISOString(),
-                area: {
-                    areaType: "CIRCLE",
-                    center: center,
-                    radius: 100
-                }
-            });
-        }, 500);
-    }); */
 }
 
 export function locationVerification(data, mockResult = "TRUE") {
@@ -399,14 +399,24 @@ export function carrierBilling(phoneNumber) {
 }
 
 
-export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage, setPatientStatus, logApi) {
+export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage, setPatientStatus, logApi, broadcast) {
     addMessage("Doctor confirmed check-in. Completing check-in process...");
     setPatientStatus("Checked In");
     addMessage("Welcome to CityCare Hospital Barcelona!");
     addMessage("Patient check-in complete.");
 
+    // Broadcast to ER Dashboard to update patient status (not remove)
+    if (broadcast) {
+        broadcast('PATIENT_CHECKED_IN', { phoneNumber, status: 'CHECKED_IN' });
+    }
+
     addMessage("Creating Geofencing Subscription for patient monitoring...");
     const geoSub = await createGeofencingSubscription(phoneNumber, hospitalLocation.lat, hospitalLocation.lng, 500);
+    
+    // Broadcast to ER Dashboard to show geofencing circle
+    if (broadcast) {
+        broadcast('SHOW_GEOFENCE_CIRCLE', { radius: 500 });
+    }
     if (logApi) logApi('Create Geofencing Subscription', 'POST', '/geofencing-subscriptions/v0.3/subscriptions', {
         protocol: "HTTP",
         sink: "https://notificationSendServer12.supertelco.com",
@@ -431,7 +441,7 @@ export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage,
     return subId;
 }
 
-export async function startMedicalTransportSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, logApi) {
+export async function startMedicalTransportSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, logApi, broadcast, patientData) {
     const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
     
     addMessage("Starting Medical Transport sequence...");
@@ -442,7 +452,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         patientId: patientId,
         alert: 'INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness',
         esi: 'Level 2 (Emergency)',
-        vitals: 'HR 120 bpm, BP 160/110 mmHg, SpO2 93%, Temp 37.2°C, irregular heart rhythm detected',
+        vitals: '♥ HR: 120 bpm | 🩸 BP: 160/110 mmHg | 🫁 O₂: 93% | 🌡 T: 37.2°C',
         complaint: 'Acute chest pain with radiation to left arm',
         eta: 'Calculating...',
         medicalHistory: '',
@@ -457,13 +467,13 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
 
     const route = generateRoute(initialUserLocation, hospitalLocation, 6);
     const timeSteps = [
-        { time: `${datePrefix}T14:30:00`, delay: 2000 }, // 30 mins
-        { time: `${datePrefix}T14:35:00`, delay: 2000 }, // 25 mins
-        { time: `${datePrefix}T14:40:00`, delay: 2000 }, // 20 mins
-        { time: `${datePrefix}T14:45:00`, delay: 2000 }, // 15 mins
-        { time: `${datePrefix}T14:50:00`, delay: 2000 }, // 10 mins
-        { time: `${datePrefix}T14:55:00`, delay: 2000 }, // 5 mins
-        { time: `${datePrefix}T15:00:00`, delay: 2000 }, // 0 mins
+        { time: `${datePrefix}T14:30:00`, delay: 800 }, // 30 mins
+        { time: `${datePrefix}T14:35:00`, delay: 800 }, // 25 mins
+        { time: `${datePrefix}T14:40:00`, delay: 800 }, // 20 mins
+        { time: `${datePrefix}T14:45:00`, delay: 800 }, // 15 mins
+        { time: `${datePrefix}T14:50:00`, delay: 800 }, // 10 mins
+        { time: `${datePrefix}T14:55:00`, delay: 800 }, // 5 mins
+        { time: `${datePrefix}T15:00:00`, delay: 800 }, // 0 mins
     ];
 
     for (let i = 0; i < route.length; i++) {
@@ -472,10 +482,12 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         const totalSteps = route.length -1;
         const stepsRemaining = totalSteps - i;
         const durationMinutes = Math.round(5 * stepsRemaining); // 5 mins per step
-        const eta = new Date(new Date(step.time).getTime() + durationMinutes * 60 * 1000);
-        const etaString = `${eta.toLocaleTimeString()} (${durationMinutes} mins)`;
-
+        
+        // Set artificial time first
         setArtificialTime(new Date(step.time));
+        
+        // Calculate ETA based on artificial time
+        const etaString = `${durationMinutes} min`;
         addMessage(`Calling Location Retrieval at ${new Date(step.time).toLocaleTimeString()}`);
         
         // Log API Interaction
@@ -485,52 +497,97 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
 
         setLocation(locRes);
         setUserGps(currentLocation);
+        
+        // Broadcast location update to ER Dashboard
+        if (broadcast && patientData) {
+            const updatedDistance = getDistanceFromLatLonInMeters(currentLocation.lat, currentLocation.lng, hospitalLocation.lat, hospitalLocation.lng);
+            const updatedDistanceKm = (updatedDistance / 1000).toFixed(1);
+            const updateData = {
+                phoneNumber: patientData.phoneNumber,
+                location: currentLocation,
+                distance: `${updatedDistanceKm} km`,
+                eta: etaString
+            };
+            console.log('Broadcasting PATIENT_STATUS_UPDATE:', updateData);
+            broadcast('PATIENT_STATUS_UPDATE', updateData);
+        }
+        
         addMessage(`Patient is at lat: ${currentLocation.lat.toFixed(4)}, lng: ${currentLocation.lng.toFixed(4)}`);
         addMessage(`ETA to hospital: ${etaString}`);
         
         let newVitals = null;
+        let medicalHistory = null;
+        let specialistsNeeded = null;
+        let equipmentNeeded = null;
+        
         if (i === 1) {
             addMessage("Paramedic analyzing vital signs and retrieving medical records...");
+            medicalHistory = 'Hypertension (diagnosed 2018), Type 2 Diabetes (controlled), Previous MI (2020)';
             setPatientMedicalDetails(prev => ({
                 ...prev,
-                medicalHistory: 'Hypertension (diagnosed 2018), Type 2 Diabetes (controlled), Previous MI (2020)'
+                medicalHistory
             }));
             addMessage("Medical history retrieved: Chronic conditions identified.");
         } else if (i === 2) {
-            newVitals = 'HR 110 bpm, BP 155/105 mmHg, SpO2 95%, Temp 37.0°C, ST-segment elevation noted on ECG';
+            newVitals = '♥ HR: 110 bpm | 🩸 BP: 155/105 mmHg | 🫁 O₂: 95% | 🌡 T: 37.0°C';
             addMessage(`Paramedic update: Cardiac monitoring active - ${newVitals}`);
             addMessage("Determining required specialists based on medical history...");
+            specialistsNeeded = ['Cardiologist', 'Emergency Physician'];
             setPatientMedicalDetails(prev => ({
                 ...prev,
                 treatmentNeeds: {
-                    specialists: ['Cardiologist', 'Emergency Physician'],
+                    specialists: specialistsNeeded,
                     equipment: []
                 }
             }));
             await new Promise(resolve => setTimeout(resolve, 1500));
             addMessage("Identifying required equipment...");
+            equipmentNeeded = ['Defibrillator', 'ECG', 'Cardiac Monitor', 'Oxygen Supply'];
             setPatientMedicalDetails(prev => ({
                 ...prev,
                 treatmentNeeds: {
                     ...prev.treatmentNeeds,
-                    equipment: ['Defibrillator', 'ECG', 'Cardiac Monitor', 'Oxygen Supply']
+                    equipment: equipmentNeeded
                 }
             }));
             addMessage("Treatment requirements transmitted to hospital.");
         } else if (i === 4) {
-            newVitals = 'HR 105 bpm, BP 145/100 mmHg, SpO2 97%, Temp 36.9°C, chest pain reduced with nitroglycerin';
+            newVitals = '♥ HR: 105 bpm | 🩸 BP: 145/100 mmHg | 🫁 O₂: 97% | 🌡 T: 36.9°C';
             addMessage(`Paramedic update: Patient responding to treatment - ${newVitals}`);
+            
+            // Generate AI summary when patient is about to reach (10 min ETA)
+            if (broadcast && patientData && patientData.chiefComplaint) {
+                const aiSummary = generateAISummary(patientData.chiefComplaint);
+                broadcast('PATIENT_STATUS_UPDATE', {
+                    phoneNumber: patientData.phoneNumber,
+                    aiSummary
+                });
+                addMessage("AI-powered diagnosis summary transmitted to ER.");
+            }
         }
 
         setPatientMedicalDetails(prev => ({ ...prev, eta: etaString, ...(newVitals ? { vitals: newVitals } : {}) }));
+        
+        // Broadcast medical updates to ER Dashboard
+        if (broadcast && patientData && (newVitals || medicalHistory || specialistsNeeded || equipmentNeeded)) {
+            const medicalUpdate = {
+                phoneNumber: patientData.phoneNumber,
+                ...(newVitals && { vitals: newVitals }),
+                ...(medicalHistory && { medicalHistory }),
+                ...(specialistsNeeded && { specialistsNeeded }),
+                ...(equipmentNeeded && { equipmentNeeded })
+            };
+            console.log('Broadcasting PATIENT_STATUS_UPDATE (medical):', medicalUpdate);
+            broadcast('PATIENT_STATUS_UPDATE', medicalUpdate);
+        }
         await new Promise(resolve => setTimeout(resolve, step.delay));
     }
 
     addMessage("Patient has arrived within the hospital vicinity.");
 
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     addMessage("Calling Location Verification...");
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const locationVerificationData = {
         device: { phoneNumber: phoneNumber },
@@ -551,6 +608,15 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         
         setPatientStatus("Awaiting Check-in");
         
+        // Broadcast arrival status to ER Dashboard
+        if (broadcast && patientData) {
+            broadcast('PATIENT_STATUS_UPDATE', {
+                phoneNumber: patientData.phoneNumber,
+                eta: 'ARRIVED',
+                status: 'ARRIVED'
+            });
+        }
+        
         // Return verification status for manual check-in
         return { verified: true, hospitalLocation };
 
@@ -560,7 +626,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
     }
 }
 
-export async function startPatientAbscondmentSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, guestName, logApi, setPaymentStatus, geofencingSubscriptionId) {
+export async function startPatientAbscondmentSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, guestName, logApi, setPaymentStatus, geofencingSubscriptionId, broadcast) {
     addMessage("Starting Patient Abscondment sequence...");
     
     // Ensure patient is at hospital initially
@@ -618,6 +684,14 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
             geofenceBreached = true;
             addMessage(`Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`);
             setPatientMedicalDetails({ patientId: '', alert: `Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
+            
+            // Broadcast LEFT_AMA status to ER Dashboard
+            if (broadcast) {
+                broadcast('PATIENT_STATUS_UPDATE', {
+                    phoneNumber: phoneNumber,
+                    status: 'LEFT_AMA'
+                });
+            }
         }
 
         await new Promise(resolve => setTimeout(resolve, 2000));

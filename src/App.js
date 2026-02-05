@@ -12,6 +12,7 @@ import { formFields, generatePatientId } from './formFields';
 import ambulanceIconPng from './ambulance.png';
 import patientIconPng from './patient.png';
 import emergencyRoomBg from './emergency2.png';
+import ERDashboard from './components/ERDashboard';
 
 
 // --- Fix for Leaflet's default icon ---
@@ -76,6 +77,25 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   const mapInstanceRef = useRef(null);
   const mapUpdateThrottle = useRef(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [liveUserGps, setLiveUserGps] = useState(userGps);
+
+  // Listen to location updates from broadcasts
+  useEffect(() => {
+    const channel = new BroadcastChannel('healthcare_demo_sync_v2');
+    channel.onmessage = (event) => {
+      const { type, data } = event.data;
+      if (type === 'SET_USER_GPS') {
+        console.log('Admin Console Map received SET_USER_GPS:', data);
+        setLiveUserGps(data);
+      }
+    };
+    return () => channel.close();
+  }, []);
+
+  // Update liveUserGps when prop changes
+  useEffect(() => {
+    setLiveUserGps(userGps);
+  }, [userGps]);
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
@@ -103,7 +123,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
 
   useEffect(() => {
     const mapInstance = mapInstanceRef.current;
-    if (isMapReady && mapInstance && userGps && hospitalLocation) {
+    if (isMapReady && mapInstance && liveUserGps && hospitalLocation) {
       mapInstance.invalidateSize();
       mapInstance.eachLayer((layer) => {
         if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline || !layer._url) { // Keep tile layer
@@ -111,13 +131,13 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         }
       });
 
-      if (verifiedPhoneNumber && userGps && hospitalLocation && !mapUpdateThrottle.current) {
+      if (verifiedPhoneNumber && liveUserGps && hospitalLocation && !mapUpdateThrottle.current) {
         mapUpdateThrottle.current = setTimeout(() => {
           mapUpdateThrottle.current = null;
         }, 1000);
 
         const updateMapView = () => {
-          const distance = getDistance(userGps, hospitalLocation);
+          const distance = getDistance(liveUserGps, hospitalLocation);
           const ZOOM_START_RADIUS = 2000;
           const MIN_ZOOM = 12;
           const MAX_ZOOM = 18;
@@ -130,8 +150,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
             newZoom = MIN_ZOOM + (MAX_ZOOM - MIN_ZOOM) * zoomProgress;
           }
 
-          const midLat = (userGps.lat + hospitalLocation.lat) / 2;
-          const midLng = (userGps.lng + hospitalLocation.lng) / 2;
+          const midLat = (liveUserGps.lat + hospitalLocation.lat) / 2;
+          const midLng = (liveUserGps.lng + hospitalLocation.lng) / 2;
 
           mapInstance.setView([midLat, midLng], newZoom, { animate: true, pan: { duration: 2.5 } });
         }
@@ -158,7 +178,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         }).addTo(mapInstance).bindPopup('Hospital Check-in Area');
       }
 
-      if (userGps && verifiedPhoneNumber) {
+      if (liveUserGps && verifiedPhoneNumber) {
+        console.log('Admin Console Map rendering ambulance at:', liveUserGps);
         const iconUrl = simulationMode === 'departure' ? patientIconPng : ambulanceIconPng;
         const userIcon = L.icon({
           iconUrl: iconUrl,
@@ -167,10 +188,10 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           popupAnchor: [0, -32]
         });
 
-        L.marker([userGps.lat, userGps.lng], { icon: userIcon }).addTo(mapInstance).bindPopup('User Location');
+        L.marker([liveUserGps.lat, liveUserGps.lng], { icon: userIcon }).addTo(mapInstance).bindPopup('User Location');
       }
     }
-  }, [userGps, verifiedPhoneNumber, hospitalLocation, isMapReady, simulationMode]);
+  }, [liveUserGps, verifiedPhoneNumber, hospitalLocation, isMapReady, simulationMode]);
 
   return <div id="map" ref={mapRef} style={{ height: '350px', width: '100%' }}></div>;
 };
@@ -417,7 +438,15 @@ function App() {
         case 'COMPLETE_CHECKIN':
           const phone = verifiedPhoneNumber || localStorage.getItem('verifiedPhoneNumber');
           if (phone && hospitalLocation) {
-            api.completeCheckIn(phone, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction).then(subId => {
+            api.completeCheckIn(phone, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction, broadcast).then(subId => {
+              if (subId) syncSetGeofencingSubscriptionId(subId);
+            });
+          }
+          break;
+        case 'ER_COMPLETE_CHECKIN':
+          // Handle check-in request from ER Dashboard
+          if (data.phoneNumber && hospitalLocation) {
+            api.completeCheckIn(data.phoneNumber, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction, broadcast).then(subId => {
               if (subId) syncSetGeofencingSubscriptionId(subId);
             });
           }
@@ -744,7 +773,7 @@ function App() {
       alert('Missing phone number or hospital location.');
       return;
     }
-    const subId = await api.completeCheckIn(phone, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction);
+    const subId = await api.completeCheckIn(phone, hospitalLocation, addMessage, syncSetPatientStatus, logApiInteraction, broadcast);
     if (subId) syncSetGeofencingSubscriptionId(subId);
   };
 
@@ -760,15 +789,16 @@ function App() {
       return;
     }
 
+    let patientKycData = null;
     if (mode === 'arrival') {
       const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
       const alertMessage = `INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness`;
       syncSetPatientMedicalDetails({ patientId, alert: alertMessage, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
       addMessage(`Alert! Incoming patient (ID: ${patientId}). High-level symptoms: Chest pains and intermittent consciousness.`);
       addMessage("Fetching patient details with KYC Fill...");
-      const kycData = await api.kycFill(phone);
-      logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, kycData._obscured);
-      syncSetFormState(kycData);
+      patientKycData = await api.kycFill(phone);
+      logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, patientKycData._obscured);
+      syncSetFormState(patientKycData);
       addMessage("Patient details populated.");
     }
 
@@ -793,20 +823,58 @@ function App() {
           lng: hospitalLocationData.area.center.longitude
         };
         syncSetHospitalLocation(actualHotelCoords);
+        
+        // Broadcast hospital location to ER Dashboard
+        broadcast('SET_HOSPITAL_LOCATION', actualHotelCoords);
 
-        // Set initial user location slightly away from the hotel
-        const userStartLat = actualHotelCoords.lat + 0.05; // 0.05 degrees ~ 5.5 km
-        const userStartLng = actualHotelCoords.lng + 0.05;
+        // Set initial user location for good demo visibility (3-4 km away from Budapest hospital)
+        const userStartLat = actualHotelCoords.lat + 0.03; // 0.03 degrees ~ 3.3 km
+        const userStartLng = actualHotelCoords.lng + 0.03;
         const initialUserCoords = { lat: userStartLat, lng: userStartLng };
 
         syncSetInitialUserLocation(initialUserCoords);
         syncSetUserGps(initialUserCoords);
         setIsLoading(false);
 
+        // Calculate distance
+        const distance = getDistance(initialUserCoords, actualHotelCoords);
+        const distanceKm = (distance / 1000).toFixed(1);
+        
+        // Determine ESI level based on symptoms
+        const esi = 1; // Critical for chest pains and consciousness issues
+        const status = esi === 1 ? 'CRITICAL' : esi === 2 ? 'URGENT' : 'MODERATE';
+        
+        // Get patient data from KYC or formState
+        const patientInfo = patientKycData || formState;
+        const age = patientInfo.birthdate ? new Date().getFullYear() - new Date(patientInfo.birthdate).getFullYear() : 'Unknown';
+        
+        // Broadcast complete patient data to ER Dashboard (without ETA initially)
+        const patientData = {
+          id: Date.now(),
+          phoneNumber: phone,
+          name: patientInfo.name || 'Unknown Patient',
+          age: age,
+          esi: esi,
+          status: status,
+          eta: 'Calculating...',
+          distance: `${distanceKm} km`,
+          location: initialUserCoords,
+          vitals: '♥ HR: Pending | 🩸 BP: Pending | 🫁 O₂: Pending | 🌡 T: Pending',
+          complaint: patientMedicalDetails.alert || 'Chest pains and intermittent consciousness',
+          chiefComplaint: patientMedicalDetails.alert || 'Chest pains and intermittent consciousness',
+          transport: 'Ambulance #A-' + Math.floor(100 + Math.random() * 900),
+          medicalHistory: '',
+          specialistsNeeded: [],
+          equipmentNeeded: []
+        };
+        broadcast('PATIENT_ADMITTED', patientData);
+        console.log('Admin Console broadcasting PATIENT_ADMITTED:', patientData);
+        addMessage(`Patient data broadcast to ER Dashboard - Distance: ${distanceKm} km, ETA will be calculated...`);
+
         const subId = await api.startMedicalTransportSequence(
           phone,
-          initialUserCoords, // Use the newly set initialUserCoords
-          actualHotelCoords, // Use the newly fetched actualHotelCoords
+          initialUserCoords,
+          actualHotelCoords,
           addMessage,
           syncSetLocation,
           syncSetUserGps,
@@ -814,7 +882,9 @@ function App() {
           syncSetPatientMedicalDetails,
           generateRoute,
           syncSetArtificialTime,
-          logApiInteraction
+          logApiInteraction,
+          broadcast,
+          patientData
         );
         if (subId) syncSetGeofencingSubscriptionId(subId);
       } else if (mode === 'departure') {
@@ -833,7 +903,8 @@ function App() {
           guestName,
           logApiInteraction,
           syncSetPaymentStatus,
-          geofencingSubscriptionId
+          geofencingSubscriptionId,
+          broadcast
         );
 
         setTimeout(() => {
@@ -922,6 +993,10 @@ function App() {
       return;
     }
     setKioskWindow(newWindow);
+  };
+
+  const openERDashboard = () => {
+    window.open(window.location.origin + '/#/er-dashboard', '_blank');
   };
 
 
@@ -1284,6 +1359,7 @@ function App() {
         <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px', display: 'none' }} onClick={() => setActiveScreen(2)}>Hospital Dashboard</button>
         <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>Admin Console</button>
         <button className="btn btn-success" style={{ margin: '0 5px' }} onClick={openKioskDisplay}>🏥 Open ER Kiosk Display</button>
+        <button className="btn btn-info" style={{ margin: '0 5px' }} onClick={openERDashboard}>📊 Open ER Dashboard (New Tab)</button>
       </nav>
 
       <main className="main-content">
@@ -1442,7 +1518,11 @@ function App() {
                   {/* Location Tracker */}
                   <div id="locationTracker" className="card">
                     <h2 className="card-header">6. Location Tracker</h2>
-                    <LocationMap userGps={userGps} hospitalLocation={hospitalLocation} verifiedPhoneNumber={verifiedPhoneNumber} simulationMode={simulationMode} />
+                    {hospitalLocation ? (
+                      <LocationMap userGps={userGps} hospitalLocation={hospitalLocation} verifiedPhoneNumber={verifiedPhoneNumber} simulationMode={simulationMode} />
+                    ) : (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No location data available</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1596,7 +1676,11 @@ function App() {
                 {/* Location Tracker */}
                 <div id="locationTracker" className="card">
                   <h2 className="card-header">7. Location Tracker</h2>
-                  <LocationMap userGps={userGps} hospitalLocation={hospitalLocation} verifiedPhoneNumber={verifiedPhoneNumber} simulationMode={simulationMode} />
+                  {hospitalLocation ? (
+                    <LocationMap userGps={userGps} hospitalLocation={hospitalLocation} verifiedPhoneNumber={verifiedPhoneNumber} simulationMode={simulationMode} />
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No location data available</div>
+                  )}
                 </div>
               </div>
             </>

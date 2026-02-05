@@ -3,12 +3,17 @@ import ReactDOM from 'react-dom/client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
 import App from './App';
+import ERDashboardPage from './ERDashboardPage';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
+// Check if we're on the ER Dashboard route
+const isERDashboard = window.location.hash === '#/er-dashboard';
+
 root.render(
   <React.StrictMode>
-    <App />
+    {isERDashboard ? <ERDashboardPage /> : <App />}
   </React.StrictMode>
 );
 

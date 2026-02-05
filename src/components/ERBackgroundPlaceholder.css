@@ -1,0 +1,11 @@
+/* Placeholder background - replace with actual emergency_room.png when available */
+.er-background-placeholder {
+  background: linear-gradient(135deg, 
+    rgba(20, 30, 48, 0.95) 0%,
+    rgba(36, 59, 85, 0.95) 50%,
+    rgba(20, 30, 48, 0.95) 100%
+  ),
+  url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"><rect fill="%23243b55" width="1920" height="1080"/><g opacity="0.1"><circle cx="200" cy="200" r="100" fill="%23fff"/><circle cx="1720" cy="880" r="150" fill="%23fff"/><rect x="800" y="400" width="320" height="280" fill="%23fff"/></g></svg>');
+  background-size: cover;
+  background-position: center;
+}
