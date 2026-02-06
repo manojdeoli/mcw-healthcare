@@ -137,9 +137,13 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           mapUpdateThrottle.current = null;
         }, 1000);
 
+        // Capture current values to avoid race condition
+        const currentHospitalLocation = hospitalLocation;
+        const currentLiveUserGps = liveUserGps;
+        
         const updateMapView = () => {
-          if (!hospitalLocation || !hospitalLocation.lat || !hospitalLocation.lng) return;
-          const distance = getDistance(liveUserGps, hospitalLocation);
+          if (!currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) return;
+          const distance = getDistance(currentLiveUserGps, currentHospitalLocation);
           const ZOOM_START_RADIUS = 2000;
           const MIN_ZOOM = 12;
           const MAX_ZOOM = 18;
@@ -152,8 +156,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
             newZoom = MIN_ZOOM + (MAX_ZOOM - MIN_ZOOM) * zoomProgress;
           }
 
-          const midLat = (liveUserGps.lat + hospitalLocation.lat) / 2;
-          const midLng = (liveUserGps.lng + hospitalLocation.lng) / 2;
+          const midLat = (currentLiveUserGps.lat + currentHospitalLocation.lat) / 2;
+          const midLng = (currentLiveUserGps.lng + currentHospitalLocation.lng) / 2;
 
           mapInstance.setView([midLat, midLng], newZoom, { animate: true, pan: { duration: 2.5 } });
         }
