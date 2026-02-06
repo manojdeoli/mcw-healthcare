@@ -126,12 +126,12 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
     if (isMapReady && mapInstance && liveUserGps && hospitalLocation) {
       mapInstance.invalidateSize();
       mapInstance.eachLayer((layer) => {
-        if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline || !layer._url) { // Keep tile layer
+        if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline || !layer._url) {
           mapInstance.removeLayer(layer);
         }
       });
 
-      if (verifiedPhoneNumber && liveUserGps && hospitalLocation && !mapUpdateThrottle.current) {
+      if (verifiedPhoneNumber && liveUserGps && hospitalLocation && hospitalLocation.lat && hospitalLocation.lng && !mapUpdateThrottle.current) {
         mapUpdateThrottle.current = setTimeout(() => {
           mapUpdateThrottle.current = null;
         }, 1000);
