@@ -123,19 +123,16 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
 
   useEffect(() => {
     const mapInstance = mapInstanceRef.current;
-    if (!isMapReady || !mapInstance) return;
-    if (!hospitalLocation || !hospitalLocation.lat || !hospitalLocation.lng) return;
-    if (!liveUserGps) return;
+    if (!isMapReady || !mapInstance || !liveUserGps || !hospitalLocation || !hospitalLocation.lat || !hospitalLocation.lng) return;
     
-    if (isMapReady && mapInstance && liveUserGps && hospitalLocation) {
-      mapInstance.invalidateSize();
-      mapInstance.eachLayer((layer) => {
-        if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline || !layer._url) {
-          mapInstance.removeLayer(layer);
-        }
-      });
+    mapInstance.invalidateSize();
+    mapInstance.eachLayer((layer) => {
+      if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline || !layer._url) {
+        mapInstance.removeLayer(layer);
+      }
+    });
 
-      if (verifiedPhoneNumber && liveUserGps && hospitalLocation && hospitalLocation.lat && hospitalLocation.lng && !mapUpdateThrottle.current) {
+    if (verifiedPhoneNumber && !mapUpdateThrottle.current) {
         mapUpdateThrottle.current = setTimeout(() => {
           mapUpdateThrottle.current = null;
         }, 1000);
@@ -195,7 +192,6 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
 
         L.marker([liveUserGps.lat, liveUserGps.lng], { icon: userIcon }).addTo(mapInstance).bindPopup('User Location');
       }
-    }
   }, [liveUserGps, verifiedPhoneNumber, hospitalLocation, isMapReady, simulationMode]);
 
   return <div id="map" ref={mapRef} style={{ height: '350px', width: '100%' }}></div>;
