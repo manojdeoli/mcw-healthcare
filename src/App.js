@@ -123,6 +123,10 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
 
   useEffect(() => {
     const mapInstance = mapInstanceRef.current;
+    if (!isMapReady || !mapInstance) return;
+    if (!hospitalLocation || !hospitalLocation.lat || !hospitalLocation.lng) return;
+    if (!liveUserGps) return;
+    
     if (isMapReady && mapInstance && liveUserGps && hospitalLocation) {
       mapInstance.invalidateSize();
       mapInstance.eachLayer((layer) => {
