@@ -131,8 +131,13 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
     
     console.log('[LocationMap useEffect] Captured - currentHospitalLocation:', currentHospitalLocation, 'currentLiveUserGps:', currentLiveUserGps);
     
-    if (!isMapReady || !mapInstance || !currentLiveUserGps || !currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) {
-      console.log('[LocationMap useEffect] Early return - isMapReady:', isMapReady, 'mapInstance:', !!mapInstance, 'currentLiveUserGps:', !!currentLiveUserGps, 'currentHospitalLocation:', !!currentHospitalLocation);
+    if (!isMapReady || !mapInstance) {
+      console.log('[LocationMap useEffect] Early return - map not ready');
+      return;
+    }
+    
+    if (!currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) {
+      console.log('[LocationMap useEffect] Early return - no valid hospitalLocation');
       return;
     }
     
@@ -210,6 +215,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         });
 
         L.marker([currentLiveUserGps.lat, currentLiveUserGps.lng], { icon: userIcon }).addTo(mapInstance).bindPopup('User Location');
+      } else {
+        console.log('[LocationMap] No user GPS to render');
       }
   }, [liveUserGps, verifiedPhoneNumber, hospitalLocation, isMapReady, simulationMode]);
 
