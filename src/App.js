@@ -122,13 +122,19 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   }, []);
 
   useEffect(() => {
+    console.log('[LocationMap useEffect] Starting - hospitalLocation:', hospitalLocation, 'liveUserGps:', liveUserGps);
     const mapInstance = mapInstanceRef.current;
     
     // Capture values immediately to prevent race conditions
     const currentHospitalLocation = hospitalLocation;
     const currentLiveUserGps = liveUserGps;
     
-    if (!isMapReady || !mapInstance || !currentLiveUserGps || !currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) return;
+    console.log('[LocationMap useEffect] Captured - currentHospitalLocation:', currentHospitalLocation, 'currentLiveUserGps:', currentLiveUserGps);
+    
+    if (!isMapReady || !mapInstance || !currentLiveUserGps || !currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) {
+      console.log('[LocationMap useEffect] Early return - isMapReady:', isMapReady, 'mapInstance:', !!mapInstance, 'currentLiveUserGps:', !!currentLiveUserGps, 'currentHospitalLocation:', !!currentHospitalLocation);
+      return;
+    }
     
     mapInstance.invalidateSize();
     mapInstance.eachLayer((layer) => {
@@ -147,7 +153,11 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         const currentLiveUserGps = liveUserGps;
         
         const updateMapView = () => {
-          if (!currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) return;
+          console.log('[updateMapView] Called with currentHospitalLocation:', currentHospitalLocation);
+          if (!currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) {
+            console.log('[updateMapView] Early return - currentHospitalLocation is null or missing lat/lng');
+            return;
+          }
           const distance = getDistance(currentLiveUserGps, currentHospitalLocation);
           const ZOOM_START_RADIUS = 2000;
           const MIN_ZOOM = 12;
