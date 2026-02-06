@@ -135,22 +135,26 @@
 
 /* Checked-in patient styling */
 .patient-card.checked-in {
-  background: rgba(23, 162, 184, 0.15);
+  background: rgba(23, 162, 184, 0.25);
   border-left-color: #17A2B8 !important;
+  border-left-width: 5px;
 }
 
 .patient-card.checked-in:hover {
-  background: rgba(23, 162, 184, 0.25);
+  background: rgba(23, 162, 184, 0.35);
+  box-shadow: 0 4px 16px rgba(23, 162, 184, 0.4);
 }
 
 /* Left AMA patient styling */
 .patient-card.left-ama {
-  background: rgba(255, 107, 53, 0.15);
+  background: rgba(255, 107, 53, 0.3);
   border-left-color: #FF6B35 !important;
+  border-left-width: 5px;
 }
 
 .patient-card.left-ama:hover {
-  background: rgba(255, 107, 53, 0.25);
+  background: rgba(255, 107, 53, 0.4);
+  box-shadow: 0 4px 16px rgba(255, 107, 53, 0.5);
 }
 
 .checkin-btn {
