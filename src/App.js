@@ -942,7 +942,6 @@ function App() {
           syncSetPaymentStatus('Not Paid');
           syncSetGeofencingSubscriptionId(null);
           syncSetOutpatientStatus('Inactive');
-          syncSetHospitalLocation(null);
           syncSetUserGps(null);
           syncSetInitialUserLocation(null);
           syncSetLastIntegrityCheckTime(null);

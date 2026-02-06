@@ -154,6 +154,9 @@ const ERDashboard = () => {
       } else if (type === 'SHOW_GEOFENCE_CIRCLE') {
         console.log('ER Dashboard received SHOW_GEOFENCE_CIRCLE');
         setShowGeofenceCircle(true);
+      } else if (type === 'REMOVE_PATIENT') {
+        console.log('ER Dashboard received REMOVE_PATIENT:', data);
+        setPatients(prev => prev.filter(p => p.phoneNumber !== data.phoneNumber));
       }
     };
     return () => channelRef.current?.close();

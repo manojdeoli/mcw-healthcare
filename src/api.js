@@ -792,6 +792,14 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     sessionStorage.clear();
     localStorage.removeItem('outpatientStatus');
 
+    // Remove patient from ER Dashboard after 30 seconds
+    setTimeout(() => {
+        if (broadcast) {
+            broadcast('REMOVE_PATIENT', { phoneNumber });
+            addMessage(`Patient record removed from ER Dashboard.`);
+        }
+    }, 30000);
+
     if (geofencingSubscriptionId) {
         addMessage(`Deleting Geofencing Subscription ${geofencingSubscriptionId}...`);
         try {
