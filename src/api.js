@@ -677,6 +677,14 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
         setUserGps(currentLocation);
         addMessage(`Patient is at lat: ${currentLocation.lat.toFixed(4)}, lng: ${currentLocation.lng.toFixed(4)}`);
 
+        // Broadcast location update to ER Dashboard
+        if (broadcast) {
+            broadcast('PATIENT_STATUS_UPDATE', {
+                phoneNumber: phoneNumber,
+                location: currentLocation
+            });
+        }
+
         // Check Geofence
         const distance = getDistanceFromLatLonInMeters(hospitalLocation.lat, hospitalLocation.lng, currentLocation.lat, currentLocation.lng);
         
