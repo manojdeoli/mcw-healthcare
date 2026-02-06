@@ -173,7 +173,7 @@ const ERDashboard = () => {
 
   // Update patient markers on map
   useEffect(() => {
-    if (mapInstanceRef.current) {
+    if (mapInstanceRef.current && hospitalLocation && hospitalLocation.lat && hospitalLocation.lng) {
       const map = mapInstanceRef.current;
       
       console.log('ER Dashboard updating map with patients:', patients);
