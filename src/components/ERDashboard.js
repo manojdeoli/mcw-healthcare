@@ -227,8 +227,21 @@ const ERDashboard = () => {
         if (patient.location && patient.status !== 'CHECKED_IN') {
           console.log(`Adding marker for ${patient.name} at`, patient.location, 'status:', patient.status);
           const iconUrl = patient.status === 'LEFT_AMA' ? patientIcon : ambulanceIcon;
-          const icon = L.icon({
-            iconUrl: iconUrl,
+          
+          // Apply CSS filter based on ESI level for severity-based coloring
+          let iconHtml = '';
+          if (patient.status !== 'LEFT_AMA') {
+            const filterStyle = patient.esi === 1 ? 'filter: hue-rotate(0deg) saturate(2) brightness(0.8);' : // Red
+                               patient.esi === 2 ? 'filter: hue-rotate(20deg) saturate(1.5) brightness(1);' : // Orange
+                               patient.esi === 3 ? 'filter: hue-rotate(40deg) saturate(1.2) brightness(1.2);' : // Yellow
+                               ''; // Default for ESI 4-5
+            iconHtml = `<img src="${iconUrl}" style="width: 32px; height: 32px; ${filterStyle}" />`;
+          } else {
+            iconHtml = `<img src="${iconUrl}" style="width: 32px; height: 32px;" />`;
+          }
+          
+          const icon = L.divIcon({
+            html: iconHtml,
             iconSize: [32, 32],
             iconAnchor: [16, 16],
             className: 'ambulance-marker'
@@ -473,23 +486,23 @@ const ERDashboard = () => {
             <div className="resource-panel">
               <h3>Resource Status</h3>
               <div className="resource-item">
-                <span>Trauma Rooms</span>
+                <span>🛏️ Trauma Rooms</span>
                 <span className="resource-value available">2 Available</span>
               </div>
               <div className="resource-item">
-                <span>General Beds</span>
+                <span>🛏️ General Beds</span>
                 <span className="resource-value available">5 Available</span>
               </div>
               <div className="resource-item">
-                <span>Ventilators</span>
+                <span>🫁 Ventilators</span>
                 <span className="resource-value limited">3 Available</span>
               </div>
               <div className="resource-item">
-                <span>Physicians</span>
+                <span>👨‍⚕️ Physicians</span>
                 <span className="resource-value available">4 On Duty</span>
               </div>
               <div className="resource-item">
-                <span>Nurses</span>
+                <span>👩‍⚕️ Nurses</span>
                 <span className="resource-value available">8 On Duty</span>
               </div>
             </div>
@@ -501,16 +514,16 @@ const ERDashboard = () => {
               )}
               {patients.filter(p => p.esi === 1).map(patient => (
                 <div key={patient.id} className="alert-item critical">
-                  <strong>CRITICAL ARRIVAL</strong>
+                  <strong>🚨 CRITICAL ARRIVAL</strong>
                   <p>{patient.name} - ESI-{patient.esi} - ETA {patient.eta}</p>
-                  <p className="alert-action">Prepare Trauma Room</p>
+                  <p className="alert-action">⚠️ Prepare Trauma Room</p>
                 </div>
               ))}
               {patients.filter(p => p.esi === 2).map(patient => (
                 <div key={patient.id} className="alert-item urgent">
-                  <strong>URGENT ARRIVAL</strong>
+                  <strong>⚠️ URGENT ARRIVAL</strong>
                   <p>{patient.name} - ESI-{patient.esi} - ETA {patient.eta}</p>
-                  <p className="alert-action">Prepare treatment area</p>
+                  <p className="alert-action">👉 Prepare treatment area</p>
                 </div>
               ))}
             </div>
