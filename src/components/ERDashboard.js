@@ -373,15 +373,12 @@ const ERDashboard = () => {
                       <h3>{patient.name}</h3>
                       <span className="patient-age">{patient.age} years</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span 
-                        className="status-badge" 
-                        style={{ backgroundColor: getStatusBadge(patient.status) }}
-                      >
-                        {patient.status === 'CHECKED_IN' ? 'In Treatment' : patient.status === 'LEFT_AMA' ? 'Left AMA' : patient.status}
-                      </span>
-                      <span style={{ fontSize: '1.2em', color: '#666', transition: 'transform 0.2s', transform: selectedPatient?.id === patient.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-                    </div>
+                    <span 
+                      className="status-badge" 
+                      style={{ backgroundColor: getStatusBadge(patient.status) }}
+                    >
+                      {patient.status === 'CHECKED_IN' ? 'In Treatment' : patient.status === 'LEFT_AMA' ? 'Left AMA' : patient.status}
+                    </span>
                   </div>
                   
                   {patient.status === 'LEFT_AMA' && (
@@ -424,6 +421,11 @@ const ERDashboard = () => {
 
                   <div className="patient-complaint">
                     <strong>Chief Complaint:</strong> {patient.complaint}
+                  </div>
+
+                  <div style={{ textAlign: 'center', padding: '8px 0', borderTop: '1px solid #eee', marginTop: '8px', cursor: 'pointer' }}>
+                    <span style={{ fontSize: '0.9em', color: '#666', transition: 'transform 0.2s', display: 'inline-block', transform: selectedPatient?.id === patient.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    <span style={{ fontSize: '0.85em', color: '#666', marginLeft: '8px' }}>{selectedPatient?.id === patient.id ? 'Hide Details' : 'Show More Details'}</span>
                   </div>
 
                   {selectedPatient?.id === patient.id && (
