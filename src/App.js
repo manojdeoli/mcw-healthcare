@@ -1385,8 +1385,7 @@ function App() {
         <button className={`btn ${activeScreen === 1 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(1)}>Network API Interactions</button>
         <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px', display: 'none' }} onClick={() => setActiveScreen(2)}>Hospital Dashboard</button>
         <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>Admin Console</button>
-        <button className="btn btn-success" style={{ margin: '0 5px' }} onClick={openKioskDisplay}>🏥 Open ER Kiosk Display</button>
-        <button className="btn btn-info" style={{ margin: '0 5px' }} onClick={openERDashboard}>📊 Open ER Dashboard (New Tab)</button>
+        <button className="btn btn-info" style={{ margin: '0 5px' }} onClick={openERDashboard}>📊 Open ER Dashboard</button>
       </nav>
 
       <main className="main-content">

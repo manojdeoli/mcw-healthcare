@@ -467,13 +467,13 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
 
     const route = generateRoute(initialUserLocation, hospitalLocation, 6);
     const timeSteps = [
-        { time: `${datePrefix}T14:30:00`, delay: 800 }, // 30 mins
-        { time: `${datePrefix}T14:35:00`, delay: 800 }, // 25 mins
-        { time: `${datePrefix}T14:40:00`, delay: 800 }, // 20 mins
-        { time: `${datePrefix}T14:45:00`, delay: 800 }, // 15 mins
-        { time: `${datePrefix}T14:50:00`, delay: 800 }, // 10 mins
-        { time: `${datePrefix}T14:55:00`, delay: 800 }, // 5 mins
-        { time: `${datePrefix}T15:00:00`, delay: 800 }, // 0 mins
+        { time: `${datePrefix}T14:30:00`, delay: 3000 }, // 30 mins
+        { time: `${datePrefix}T14:35:00`, delay: 3000 }, // 25 mins
+        { time: `${datePrefix}T14:40:00`, delay: 3000 }, // 20 mins
+        { time: `${datePrefix}T14:45:00`, delay: 3000 }, // 15 mins
+        { time: `${datePrefix}T14:50:00`, delay: 3000 }, // 10 mins
+        { time: `${datePrefix}T14:55:00`, delay: 3000 }, // 5 mins
+        { time: `${datePrefix}T15:00:00`, delay: 3000 }, // 0 mins
     ];
 
     for (let i = 0; i < route.length; i++) {
