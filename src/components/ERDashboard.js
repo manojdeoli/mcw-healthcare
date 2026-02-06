@@ -373,12 +373,15 @@ const ERDashboard = () => {
                       <h3>{patient.name}</h3>
                       <span className="patient-age">{patient.age} years</span>
                     </div>
-                    <span 
-                      className="status-badge" 
-                      style={{ backgroundColor: getStatusBadge(patient.status) }}
-                    >
-                      {patient.status === 'CHECKED_IN' ? 'In Treatment' : patient.status === 'LEFT_AMA' ? 'Left AMA' : patient.status}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span 
+                        className="status-badge" 
+                        style={{ backgroundColor: getStatusBadge(patient.status) }}
+                      >
+                        {patient.status === 'CHECKED_IN' ? 'In Treatment' : patient.status === 'LEFT_AMA' ? 'Left AMA' : patient.status}
+                      </span>
+                      <span style={{ fontSize: '1.2em', color: '#666', transition: 'transform 0.2s', transform: selectedPatient?.id === patient.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </div>
                   </div>
                   
                   {patient.status === 'LEFT_AMA' && (
