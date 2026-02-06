@@ -231,9 +231,10 @@ const ERDashboard = () => {
           // Apply CSS filter based on ESI level for severity-based coloring
           let iconHtml = '';
           if (patient.status !== 'LEFT_AMA') {
-            const filterStyle = patient.esi === 1 ? 'filter: hue-rotate(0deg) saturate(2) brightness(0.8);' : // Red
-                               patient.esi === 2 ? 'filter: hue-rotate(20deg) saturate(1.5) brightness(1);' : // Orange
-                               patient.esi === 3 ? 'filter: hue-rotate(40deg) saturate(1.2) brightness(1.2);' : // Yellow
+            // Convert to grayscale first, then apply color
+            const filterStyle = patient.esi === 1 ? 'filter: grayscale(100%) sepia(100%) saturate(500%) hue-rotate(320deg) brightness(0.9);' : // Red
+                               patient.esi === 2 ? 'filter: grayscale(100%) sepia(100%) saturate(400%) hue-rotate(10deg) brightness(1);' : // Orange
+                               patient.esi === 3 ? 'filter: grayscale(100%) sepia(100%) saturate(300%) hue-rotate(40deg) brightness(1.1);' : // Yellow
                                ''; // Default for ESI 4-5
             iconHtml = `<img src="${iconUrl}" style="width: 32px; height: 32px; ${filterStyle}" />`;
           } else {
@@ -509,9 +510,16 @@ const ERDashboard = () => {
 
             <div className="alert-panel">
               <h3>⚠️ Priority Alerts</h3>
-              {patients.filter(p => p.esi <= 2).length === 0 && (
+              {patients.filter(p => p.esi <= 2 || p.status === 'LEFT_AMA').length === 0 && (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No critical alerts</div>
               )}
+              {patients.filter(p => p.status === 'LEFT_AMA').map(patient => (
+                <div key={patient.id} className="alert-item" style={{ background: 'rgba(255, 107, 53, 0.3)', borderLeft: '4px solid #FF6B35' }}>
+                  <strong>🚶 PATIENT LEFT AMA</strong>
+                  <p>{patient.name} - Left Against Medical Advice</p>
+                  <p className="alert-action">📞 Contact patient immediately</p>
+                </div>
+              ))}
               {patients.filter(p => p.esi === 1).map(patient => (
                 <div key={patient.id} className="alert-item critical">
                   <strong>🚨 CRITICAL ARRIVAL</strong>
