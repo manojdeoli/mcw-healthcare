@@ -123,7 +123,12 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
 
   useEffect(() => {
     const mapInstance = mapInstanceRef.current;
-    if (!isMapReady || !mapInstance || !liveUserGps || !hospitalLocation || !hospitalLocation.lat || !hospitalLocation.lng) return;
+    
+    // Capture values immediately to prevent race conditions
+    const currentHospitalLocation = hospitalLocation;
+    const currentLiveUserGps = liveUserGps;
+    
+    if (!isMapReady || !mapInstance || !currentLiveUserGps || !currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) return;
     
     mapInstance.invalidateSize();
     mapInstance.eachLayer((layer) => {
@@ -166,7 +171,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         }
       }
 
-      if (hospitalLocation && hospitalLocation.lat && hospitalLocation.lng) {
+      if (currentHospitalLocation && currentHospitalLocation.lat && currentHospitalLocation.lng) {
         const hospitalIcon = L.divIcon({
           html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#FF0000" width="32px" height="32px"><path d="M18 13h-5v5h-2v-5H6v-2h5V6h2v5h5v2z"/><path d="M0 0h24v24H0z" fill="none"/></svg>`,
           className: 'hospital-location-icon',
@@ -174,9 +179,9 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           iconAnchor: [16, 32],
           popupAnchor: [0, -32]
         });
-        L.marker([hospitalLocation.lat, hospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Wellsoon Hospital');
+        L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Wellsoon Hospital');
 
-        L.circle([hospitalLocation.lat, hospitalLocation.lng], {
+        L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
           color: 'red',
           fillColor: '#ff0000',
           fillOpacity: 0.2,
@@ -184,8 +189,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         }).addTo(mapInstance).bindPopup('Hospital Check-in Area');
       }
 
-      if (liveUserGps && verifiedPhoneNumber) {
-        console.log('Admin Console Map rendering ambulance at:', liveUserGps);
+      if (currentLiveUserGps && verifiedPhoneNumber) {
+        console.log('Admin Console Map rendering ambulance at:', currentLiveUserGps);
         const iconUrl = simulationMode === 'departure' ? patientIconPng : ambulanceIconPng;
         const userIcon = L.icon({
           iconUrl: iconUrl,
@@ -194,7 +199,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           popupAnchor: [0, -32]
         });
 
-        L.marker([liveUserGps.lat, liveUserGps.lng], { icon: userIcon }).addTo(mapInstance).bindPopup('User Location');
+        L.marker([currentLiveUserGps.lat, currentLiveUserGps.lng], { icon: userIcon }).addTo(mapInstance).bindPopup('User Location');
       }
   }, [liveUserGps, verifiedPhoneNumber, hospitalLocation, isMapReady, simulationMode]);
 
