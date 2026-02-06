@@ -137,6 +137,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         }, 1000);
 
         const updateMapView = () => {
+          if (!hospitalLocation || !hospitalLocation.lat || !hospitalLocation.lng) return;
           const distance = getDistance(liveUserGps, hospitalLocation);
           const ZOOM_START_RADIUS = 2000;
           const MIN_ZOOM = 12;
