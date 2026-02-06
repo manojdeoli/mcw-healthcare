@@ -3,6 +3,7 @@ import './ERDashboard.css';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ambulanceIcon from '../ambulance.png';
+import patientIcon from '../patient.png';
 import emergencyRoomBg from '../emergency2.png';
 
 const HOSPITAL_LOCATION = { lat: 47.4863, lng: 19.0792 };
@@ -225,8 +226,9 @@ const ERDashboard = () => {
       patients.forEach(patient => {
         if (patient.location && patient.status !== 'CHECKED_IN') {
           console.log(`Adding marker for ${patient.name} at`, patient.location, 'status:', patient.status);
+          const iconUrl = patient.status === 'LEFT_AMA' ? patientIcon : ambulanceIcon;
           const icon = L.icon({
-            iconUrl: ambulanceIcon,
+            iconUrl: iconUrl,
             iconSize: [32, 32],
             iconAnchor: [16, 16],
             className: 'ambulance-marker'
