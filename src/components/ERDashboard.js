@@ -221,9 +221,9 @@ const ERDashboard = () => {
         console.log('Geofencing circle added at:', hospitalLocation);
       }
       
-      // Add patient ambulance markers (show all moving patients including ARRIVED)
+      // Add patient ambulance markers (show all moving patients including LEFT_AMA)
       patients.forEach(patient => {
-        if (patient.location && patient.status !== 'CHECKED_IN' && patient.status !== 'LEFT_AMA') {
+        if (patient.location && patient.status !== 'CHECKED_IN') {
           console.log(`Adding marker for ${patient.name} at`, patient.location, 'status:', patient.status);
           const icon = L.icon({
             iconUrl: ambulanceIcon,
