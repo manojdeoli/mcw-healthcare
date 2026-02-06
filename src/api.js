@@ -632,11 +632,12 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     // Ensure patient is at hospital initially
     setUserGps(hospitalLocation);
     
-    // Broadcast initial hospital location to ER Dashboard
+    // Broadcast initial hospital location to ER Dashboard with CHECKED_IN status
     if (broadcast) {
         broadcast('PATIENT_STATUS_UPDATE', {
             phoneNumber: phoneNumber,
-            location: hospitalLocation
+            location: hospitalLocation,
+            status: 'CHECKED_IN'
         });
     }
 
