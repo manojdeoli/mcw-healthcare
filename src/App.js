@@ -62,6 +62,9 @@ const generateRoute = (start, end, sections = 10) => {
 // --- End of Location Simulation Data ---
 
 function getDistance(coords1, coords2) {
+  if (!coords1 || !coords2 || !coords1.lat || !coords1.lng || !coords2.lat || !coords2.lng) {
+    return 0;
+  }
   const R = 6371e3; // metres
   const φ1 = coords1.lat * Math.PI / 180;
   const φ2 = coords2.lat * Math.PI / 180;
@@ -100,7 +103,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
       if (mapRef.current._leaflet_id) mapRef.current._leaflet_id = null;
-      const map = L.map(mapRef.current).setView([-33.8688, 151.2093], 12);
+      const map = L.map(mapRef.current).setView([47.48627616952785, 19.07915612501993], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
@@ -159,8 +162,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         
         const updateMapView = () => {
           console.log('[updateMapView] Called with currentHospitalLocation:', currentHospitalLocation);
-          if (!currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng) {
-            console.log('[updateMapView] Early return - currentHospitalLocation is null or missing lat/lng');
+          if (!currentHospitalLocation || !currentHospitalLocation.lat || !currentHospitalLocation.lng || !currentLiveUserGps || !currentLiveUserGps.lat || !currentLiveUserGps.lng) {
+            console.log('[updateMapView] Early return - missing coordinates');
             return;
           }
           const distance = getDistance(currentLiveUserGps, currentHospitalLocation);
@@ -194,7 +197,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           iconAnchor: [16, 32],
           popupAnchor: [0, -32]
         });
-        L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Wellsoon Hospital');
+        L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Wellsoon Hospital - Budapest, Hungary');
 
         L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
           color: 'red',
@@ -278,7 +281,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState(null);
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 47.48627616952785, lng: 19.07915612501993 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -413,6 +416,10 @@ function App() {
           break;
         case 'SET_PATIENT_STATUS':
           setPatientStatus(data);
+          // Clear the incoming patient alert when patient is checked in
+          if (data === 'Checked In') {
+            syncSetPatientMedicalDetails(prev => ({ ...prev, alert: '' }));
+          }
           break;
         case 'SET_PAYMENT_STATUS':
           setPaymentStatus(data);
@@ -491,7 +498,14 @@ function App() {
   // Sync Wrappers
   const syncSetUserGps = (val) => { setUserGps(val); broadcast('SET_USER_GPS', val); };
   const syncSetSimulationMode = (val) => { setSimulationMode(val); broadcast('SET_SIMULATION_MODE', val); };
-  const syncSetPatientStatus = (val) => { setPatientStatus(val); broadcast('SET_PATIENT_STATUS', val); };
+  const syncSetPatientStatus = (val) => { 
+    setPatientStatus(val); 
+    broadcast('SET_PATIENT_STATUS', val);
+    // Clear the incoming patient alert when patient is checked in
+    if (val === 'Checked In') {
+      syncSetPatientMedicalDetails(prev => ({ ...prev, alert: '' }));
+    }
+  };
   const syncSetPaymentStatus = (val) => { setPaymentStatus(val); broadcast('SET_PAYMENT_STATUS', val); };
   const syncSetGeofencingSubscriptionId = (val) => { setGeofencingSubscriptionId(val); broadcast('SET_GEOFENCING_SUB_ID', val); };
   const syncSetPatientMedicalDetails = (val) => {

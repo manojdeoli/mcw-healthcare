@@ -78,7 +78,7 @@ class AuthService {
             throw new Error('Must call getClientCredentials and getEndpoints first');
         }
 
-        const redirectUri = 'http://localhost:3000/redirect';
+        const redirectUri = window.location.origin + '/redirect';
 
         const params = new URLSearchParams({
             scope: 'number-verification:verify',
