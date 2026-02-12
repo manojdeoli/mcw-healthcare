@@ -332,8 +332,37 @@ function App() {
           const savedState = authService.restoreAppState();
           if (savedState && savedState.activeScreen) {
             console.log('💾 Restoring app state:', savedState);
-            setActiveScreen(savedState.activeScreen);
+            setActiveScreen(parseInt(savedState.activeScreen));
             localStorage.setItem('activeScreen', savedState.activeScreen.toString());
+            
+            // Restore outpatient monitoring state
+            if (savedState.monitoringState) {
+              if (savedState.monitoringState.outpatientStatus) {
+                syncSetOutpatientStatus(savedState.monitoringState.outpatientStatus);
+              }
+              if (savedState.monitoringState.shouldResumeMonitoring) {
+                localStorage.setItem('shouldResumeMonitoring', savedState.monitoringState.shouldResumeMonitoring);
+              }
+              // Restore other application state
+              if (savedState.monitoringState.patientStatus) {
+                syncSetPatientStatus(savedState.monitoringState.patientStatus);
+              }
+              if (savedState.monitoringState.registrationStatus) {
+                syncSetRegistrationStatus(savedState.monitoringState.registrationStatus);
+              }
+              if (savedState.monitoringState.identityIntegrity) {
+                syncSetIdentityIntegrity(savedState.monitoringState.identityIntegrity);
+              }
+              if (savedState.monitoringState.patientMedicalDetails) {
+                try {
+                  const medicalDetails = JSON.parse(savedState.monitoringState.patientMedicalDetails);
+                  syncSetPatientMedicalDetails(medicalDetails);
+                } catch (e) {
+                  console.warn('Failed to restore patient medical details:', e);
+                }
+              }
+            }
+            
             // Restore phone number if it was saved
             if (savedState.phoneNumber) {
               setPhone(savedState.phoneNumber);
@@ -347,6 +376,32 @@ function App() {
                   setTimeout(() => sessionStorage.removeItem('verify_triggered'), 2000);
                 }
               }, 500);
+            }
+            
+            // Auto-resume outpatient monitoring if it was active
+            if (savedState.monitoringState?.shouldResumeMonitoring) {
+              setTimeout(() => {
+                const monitoringBtn = document.querySelector('#outpatientMonitoring .btn-primary');
+                if (monitoringBtn && !sessionStorage.getItem('monitoring_triggered')) {
+                  sessionStorage.setItem('monitoring_triggered', 'true');
+                  monitoringBtn.click();
+                  setTimeout(() => sessionStorage.removeItem('monitoring_triggered'), 2000);
+                }
+              }, 1000);
+            }
+            // Restore form state if it was saved
+            if (savedState.formState) {
+              console.log('💾 Restoring form state:', savedState.formState);
+              syncSetFormState(savedState.formState);
+              // Also populate DOM elements directly
+              setTimeout(() => {
+                Object.keys(savedState.formState).forEach(field => {
+                  const element = document.getElementById(field);
+                  if (element) {
+                    element.value = savedState.formState[field];
+                  }
+                });
+              }, 100);
             }
           }
         } else if (authResult.error) {
@@ -729,40 +784,44 @@ function App() {
   const validatePhone = async (e) => {
     e.preventDefault();
     
-    // Clear session storage and localStorage when starting new verification
-    sessionStorage.clear();
-    localStorage.removeItem('outpatientStatus');
+    // Don't reset state if this is an auto-triggered verification during monitoring resume
+    const isMonitoringResume = sessionStorage.getItem('monitoring_triggered');
     
-    // Reset all application state to defaults when starting new verification
-    syncSetRegistrationStatus('Not Registered');
-    syncSetIdentityIntegrity('Bad');
-    syncSetPatientStatus('Not Checked In');
-    syncSetPaymentStatus('Not Paid');
-    syncSetGeofencingSubscriptionId(null);
-    syncSetOutpatientStatus('Inactive');
-    syncSetUserGps(null);
-    syncSetInitialUserLocation(null);
-    syncSetLastIntegrityCheckTime(null);
-    syncSetPatientMedicalDetails({
-      patientId: '',
-      esi: '',
-      vitals: '',
-      complaint: '',
-      eta: '',
-      medicalHistory: '',
-      treatmentNeeds: { specialists: [], equipment: [] },
-    });
-    syncSetAdditionalPatients([]);
-    syncSetKycMatchResponse(null);
-    syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
-    syncSetArtificialTime(null);
-    setSuccess('');
-    syncSetSimulationMode('arrival');
-    
-    // Clear activity logs and API logs
-    setMessages([]);
-    setApiLogs([]);
-    
+    if (!isMonitoringResume) {
+      // Clear session storage and localStorage when starting new verification
+      sessionStorage.clear();
+      localStorage.removeItem('outpatientStatus');
+      
+      // Reset all application state to defaults when starting new verification
+      syncSetRegistrationStatus('Not Registered');
+      syncSetIdentityIntegrity('Bad');
+      syncSetPatientStatus('Not Checked In');
+      syncSetPaymentStatus('Not Paid');
+      syncSetGeofencingSubscriptionId(null);
+      syncSetOutpatientStatus('Inactive');
+      syncSetUserGps(null);
+      syncSetInitialUserLocation(null);
+      syncSetLastIntegrityCheckTime(null);
+      syncSetPatientMedicalDetails({
+        patientId: '',
+        esi: '',
+        vitals: '',
+        complaint: '',
+        eta: '',
+        medicalHistory: '',
+        treatmentNeeds: { specialists: [], equipment: [] },
+      });
+      syncSetAdditionalPatients([]);
+      syncSetKycMatchResponse(null);
+      syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
+      syncSetArtificialTime(null);
+      setSuccess('');
+      syncSetSimulationMode('arrival');
+      
+      // Clear activity logs and API logs
+      setMessages([]);
+      setApiLogs([]);
+    }
     const fullPhoneNumber = phone.replace(/\s/g, '');
     const regex = /^\+\d{10,15}$/
     setError('');
@@ -1026,12 +1085,14 @@ function App() {
       return;
     }
     
-    // Clear the flag first to prevent auto-resume on refresh
-    localStorage.removeItem('shouldResumeMonitoring');
-    
-    // Save current screen and flag to resume monitoring after OAuth
+    // Save current state before starting monitoring
     localStorage.setItem('activeScreen', activeScreen.toString());
     localStorage.setItem('shouldResumeMonitoring', 'true');
+    localStorage.setItem('outpatientStatus', 'Initializing...');
+    localStorage.setItem('patientStatus', patientStatus);
+    localStorage.setItem('registrationStatus', registrationStatus);
+    localStorage.setItem('identityIntegrity', identityIntegrity);
+    localStorage.setItem('patientMedicalDetails', JSON.stringify(patientMedicalDetails));
     
     syncSetArtificialTime(new Date());
     setIsSequenceRunning(true);
@@ -1050,13 +1111,15 @@ function App() {
 
         await api.startOutpatientMonitoringSequence(phone, startLoc, addMessage, syncSetLocation, syncSetUserGps, syncSetOutpatientStatus, syncSetArtificialTime, logApiInteraction);
         
-        // Clear the flag after monitoring starts successfully
+        // Clear the flag after monitoring completes successfully
         localStorage.removeItem('shouldResumeMonitoring');
+        localStorage.removeItem('outpatientStatus');
     } catch (e) {
         console.error(e);
         addMessage("Error in monitoring sequence: " + e.message);
-        // Clear flag on error too
+        // Clear flags on error too
         localStorage.removeItem('shouldResumeMonitoring');
+        localStorage.removeItem('outpatientStatus');
     }
   };
 

@@ -36,16 +36,43 @@ async function ensureValidToken() {
     
     console.log('⚠️ Token expired or invalid, triggering silent re-authentication...');
     
-    // Save outpatient status before re-authentication
-    const currentOutpatientStatus = localStorage.getItem('outpatientStatus');
-    
-    // Use already-saved activeScreen from localStorage
+    // Save comprehensive app state before re-authentication
     const appState = {
-        activeScreen: localStorage.getItem('activeScreen'),
+        activeScreen: document.querySelector('.btn-primary')?.textContent?.includes('Admin Console') ? 3 : 
+                     document.querySelector('.btn-primary')?.textContent?.includes('Network API') ? 1 : 
+                     localStorage.getItem('activeScreen') || '3',
         verifiedPhoneNumber: localStorage.getItem('verifiedPhoneNumber'),
-        outpatientStatus: currentOutpatientStatus,
+        outpatientStatus: localStorage.getItem('outpatientStatus'),
+        // Save form state from DOM
+        formState: {},
+        // Save outpatient monitoring state
+        monitoringState: {
+            outpatientStatus: localStorage.getItem('outpatientStatus'),
+            shouldResumeMonitoring: localStorage.getItem('shouldResumeMonitoring'),
+            // Save current application state
+            patientStatus: localStorage.getItem('patientStatus'),
+            registrationStatus: localStorage.getItem('registrationStatus'),
+            identityIntegrity: localStorage.getItem('identityIntegrity'),
+            patientMedicalDetails: localStorage.getItem('patientMedicalDetails')
+        },
         timestamp: Date.now()
     };
+    
+    // Capture current form values from DOM
+    const formFields = ['name', 'email', 'address', 'birthdate'];
+    formFields.forEach(field => {
+        const element = document.getElementById(field);
+        if (element) {
+            appState.formState[field] = element.value;
+        }
+    });
+    
+    // Save current phone input value
+    const phoneInput = document.getElementById('phone');
+    if (phoneInput) {
+        appState.phoneNumber = phoneInput.value;
+    }
+    
     authService.saveAppState(appState);
     
     // Get phone number for re-authentication
@@ -867,6 +894,20 @@ export function scamSignal(phoneNumber) {
 export async function startOutpatientMonitoringSequence(phoneNumber, initialUserLocation, addMessage, setLocation, setUserGps, setOutpatientStatus, setArtificialTime, logApi) {
     addMessage("Starting Outpatient Monitoring Sequence...");
     setOutpatientStatus("Monitoring Active");
+
+    // 0. Phone Number Verification (for each outpatient)
+    addMessage("Step 0: Verifying Phone Number for Outpatient...");
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const phoneVerifyRes = await verifyPhoneNumber(phoneNumber);
+    if (logApi) logApi('Number Verification', 'POST', '/number-verification/number-verification/v0/verify', { phoneNumber }, phoneVerifyRes);
+    
+    if (phoneVerifyRes.devicePhoneNumberVerified !== true) {
+        addMessage("Phone number verification failed for outpatient monitoring.");
+        setOutpatientStatus("Phone Verification Failed");
+        return;
+    }
+    addMessage("Phone number verified for outpatient monitoring.");
 
     // 1. Identity Verification
     addMessage("Step 1: Verifying Patient Identity & Integrity...");
