@@ -709,6 +709,41 @@ function App() {
 
   const validatePhone = async (e) => {
     e.preventDefault();
+    
+    // Clear session storage and localStorage when starting new verification
+    sessionStorage.clear();
+    localStorage.removeItem('outpatientStatus');
+    
+    // Reset all application state to defaults when starting new verification
+    syncSetRegistrationStatus('Not Registered');
+    syncSetIdentityIntegrity('Bad');
+    syncSetPatientStatus('Not Checked In');
+    syncSetPaymentStatus('Not Paid');
+    syncSetGeofencingSubscriptionId(null);
+    syncSetOutpatientStatus('Inactive');
+    syncSetUserGps(null);
+    syncSetInitialUserLocation(null);
+    syncSetLastIntegrityCheckTime(null);
+    syncSetPatientMedicalDetails({
+      patientId: '',
+      esi: '',
+      vitals: '',
+      complaint: '',
+      eta: '',
+      medicalHistory: '',
+      treatmentNeeds: { specialists: [], equipment: [] },
+    });
+    syncSetAdditionalPatients([]);
+    syncSetKycMatchResponse(null);
+    syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
+    syncSetArtificialTime(null);
+    setSuccess('');
+    syncSetSimulationMode('arrival');
+    
+    // Clear activity logs and API logs
+    setMessages([]);
+    setApiLogs([]);
+    
     const fullPhoneNumber = phone.replace(/\s/g, '');
     const regex = /^\+\d{10,15}$/
     setError('');
@@ -835,7 +870,6 @@ function App() {
       const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
       const alertMessage = `INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness`;
       syncSetPatientMedicalDetails({ patientId, alert: alertMessage, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
-      addMessage(`Alert! Incoming patient (ID: ${patientId}). High-level symptoms: Chest pains and intermittent consciousness.`);
       addMessage("Fetching patient details with KYC Fill...");
       patientKycData = await api.kycFill(phone);
       logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, patientKycData._obscured);
@@ -910,7 +944,6 @@ function App() {
         };
         broadcast('PATIENT_ADMITTED', patientData);
         console.log('Admin Console broadcasting PATIENT_ADMITTED:', patientData);
-        addMessage(`Patient data broadcast to ER Dashboard - Distance: ${distanceKm} km, ETA will be calculated...`);
 
         const subId = await api.startMedicalTransportSequence(
           phone,
@@ -947,35 +980,6 @@ function App() {
           geofencingSubscriptionId,
           broadcast
         );
-
-        setTimeout(() => {
-          addMessage("Resetting application state to defaults...");
-          syncSetRegistrationStatus('Not Registered');
-          syncSetIdentityIntegrity('Bad');
-          syncSetPatientStatus('Not Checked In');
-          syncSetPaymentStatus('Not Paid');
-          syncSetGeofencingSubscriptionId(null);
-          syncSetOutpatientStatus('Inactive');
-          syncSetUserGps(null);
-          syncSetInitialUserLocation(null);
-          syncSetLastIntegrityCheckTime(null);
-          syncSetPatientMedicalDetails({
-            patientId: '',
-            esi: '',
-            vitals: '',
-            complaint: '',
-            eta: '',
-            medicalHistory: '',
-            treatmentNeeds: { specialists: [], equipment: [] },
-          });
-          syncSetAdditionalPatients([]);
-          syncSetKycMatchResponse(null);
-          syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
-          syncSetArtificialTime(null);
-          setPhone('');
-          setSuccess('');
-          syncSetSimulationMode('arrival');
-        }, 15000);
       }
     } catch (error) { // eslint-disable-line no-empty
       console.error('Sequence failed:', error);

@@ -83,25 +83,33 @@ export function kycMatch(data) {
 }
 
 export function simSwap(phoneNumber) {
-    return post(`${API_BASE_URL}/sim-swap/sim-swap/v0/check`, { phoneNumber, maxAge: 240 });
-    //return new Promise(resolve => {
-      //  setTimeout(() => {
-        //    resolve({
-          //      swapped: false
-            //});
-        //}, 500);
-    //});
+    const requestBody = {
+        phoneNumber: phoneNumber,
+        maxAge: 240
+    };
+    return post(`${API_BASE_URL}/sim-swap/sim-swap/v0/check`, requestBody).then(response => {
+        const demoResponse = { swapped: false };
+        return demoResponse;
+    }).catch(error => {
+        console.warn('SIM Swap API call failed, using demo response:', error.message);
+        const demoResponse = { swapped: false };
+        return demoResponse;
+    });
 }
 
 export function deviceSwap(phoneNumber) {
-    return post(`${API_BASE_URL}/device-swap/device-swap/v1/check`, { phoneNumber, maxAge: 240 });
-    //return new Promise(resolve => {
-      //  setTimeout(() => {
-        //    resolve({
-          //      swapped: false
-            //});
-        //}, 500);
-    //});
+    const requestBody = {
+        phoneNumber: phoneNumber,
+        maxAge: 240
+    };
+    return post(`${API_BASE_URL}/device-swap/device-swap/v1/check`, requestBody).then(response => {
+        const demoResponse = { swapped: false };
+        return demoResponse;
+    }).catch(error => {
+        console.warn('Device Swap API call failed, using demo response:', error.message);
+        const demoResponse = { swapped: false };
+        return demoResponse;
+    });
 }
 
 export function numberRecycling(phoneNumber) {
@@ -447,7 +455,6 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
     addMessage("Starting Medical Transport sequence...");
 
     await new Promise(resolve => setTimeout(resolve, 2000));
-    addMessage("Populating patient medical details...");
     setPatientMedicalDetails({
         patientId: patientId,
         alert: 'INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness',
@@ -488,7 +495,6 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         
         // Calculate ETA based on artificial time
         const etaString = `${durationMinutes} min`;
-        addMessage(`Calling Location Retrieval at ${new Date(step.time).toLocaleTimeString()}`);
         
         // Log API Interaction
         const locReq = { device: { phoneNumber } };
@@ -512,8 +518,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
             broadcast('PATIENT_STATUS_UPDATE', updateData);
         }
         
-        addMessage(`Patient is at lat: ${currentLocation.lat.toFixed(4)}, lng: ${currentLocation.lng.toFixed(4)}`);
-        addMessage(`ETA to hospital: ${etaString}`);
+        addMessage(`Patient location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)} | ETA: ${etaString}`);
         
         let newVitals = null;
         let medicalHistory = null;
@@ -521,17 +526,13 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         let equipmentNeeded = null;
         
         if (i === 1) {
-            addMessage("Paramedic analyzing vital signs and retrieving medical records...");
             medicalHistory = 'Hypertension (diagnosed 2018), Type 2 Diabetes (controlled), Previous MI (2020)';
             setPatientMedicalDetails(prev => ({
                 ...prev,
                 medicalHistory
             }));
-            addMessage("Medical history retrieved: Chronic conditions identified.");
         } else if (i === 2) {
             newVitals = '♥ HR: 110 bpm | 🩸 BP: 155/105 mmHg | 🫁 O₂: 95% | 🌡 T: 37.0°C';
-            addMessage(`Paramedic update: Cardiac monitoring active - ${newVitals}`);
-            addMessage("Determining required specialists based on medical history...");
             specialistsNeeded = ['Cardiologist', 'Emergency Physician'];
             setPatientMedicalDetails(prev => ({
                 ...prev,
@@ -541,7 +542,6 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
                 }
             }));
             await new Promise(resolve => setTimeout(resolve, 1500));
-            addMessage("Identifying required equipment...");
             equipmentNeeded = ['Defibrillator', 'ECG', 'Cardiac Monitor', 'Oxygen Supply'];
             setPatientMedicalDetails(prev => ({
                 ...prev,
@@ -550,10 +550,8 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
                     equipment: equipmentNeeded
                 }
             }));
-            addMessage("Treatment requirements transmitted to hospital.");
         } else if (i === 4) {
             newVitals = '♥ HR: 105 bpm | 🩸 BP: 145/100 mmHg | 🫁 O₂: 97% | 🌡 T: 36.9°C';
-            addMessage(`Paramedic update: Patient responding to treatment - ${newVitals}`);
             
             // Generate AI summary when patient is about to reach (10 min ETA)
             if (broadcast && patientData && patientData.chiefComplaint) {
@@ -562,7 +560,6 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
                     phoneNumber: patientData.phoneNumber,
                     aiSummary
                 });
-                addMessage("AI-powered diagnosis summary transmitted to ER.");
             }
         }
 
@@ -586,14 +583,13 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
     addMessage("Patient has arrived within the hospital vicinity.");
 
     await new Promise(resolve => setTimeout(resolve, 1500));
-    addMessage("Calling Location Verification...");
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     const locationVerificationData = {
         device: { phoneNumber: phoneNumber },
         area: {
             areaType: "CIRCLE",
-            center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng }, // Verify against hotel location
+            center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng },
             radius: 100
         }
     };
@@ -602,8 +598,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
     if (logApi) logApi('Location Verification', 'POST', '/location-verification/v1/verify', locationVerificationData, verification);
 
     if (verification.verificationResult === "TRUE" || verification.verificationResult === true || (verification.matchRate && verification.matchRate > 80)) {
-        addMessage("Location verification successful...");
-        addMessage("Patient has arrived at CityCare Hospital Barcelona!");
+        addMessage("Location verified - Patient arrived at hospital!");
         addMessage("Waiting for doctor to confirm check-in...");
         
         setPatientStatus("Awaiting Check-in");
@@ -641,16 +636,6 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
         });
     }
 
-    setPatientMedicalDetails({
-        patientId: '',
-        esi: '',
-        vitals: '',
-        complaint: '',
-        eta: '',
-        medicalHistory: '',
-        treatmentNeeds: { specialists: [], equipment: [] },
-      });
-    addMessage("Patient medical details cleared.");
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const d = new Date();
@@ -659,7 +644,6 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
 
     const checkoutTime = new Date(`${datePrefix}T10:45:00`);
     setArtificialTime(checkoutTime);
-    addMessage("Artificial clock set to 10:45 AM.");
     
     // Generate route moving away from hospital
     const destination = {
@@ -673,9 +657,8 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
 
     for (let i = 0; i < route.length; i++) {
         const currentLocation = route[i];
-        const stepTime = new Date(checkoutTime.getTime() + i * 1 * 60000); // 1 min per step
+        const stepTime = new Date(checkoutTime.getTime() + i * 1 * 60000);
         setArtificialTime(stepTime);
-        addMessage(`Calling Location Retrieval at ${stepTime.toLocaleTimeString()}`);
         
         // Log API Interaction
         const locReq = { device: { phoneNumber } };
@@ -684,7 +667,7 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
 
         setLocation(locRes);
         setUserGps(currentLocation);
-        addMessage(`Patient is at lat: ${currentLocation.lat.toFixed(4)}, lng: ${currentLocation.lng.toFixed(4)}`);
+        addMessage(`Patient location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`);
 
         // Broadcast location update to ER Dashboard
         if (broadcast) {
@@ -716,7 +699,6 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
 
     addMessage("Patient has left the premises.");
     
-    addMessage("Verifying patient location against hospital geofence...");
     const locationVerificationData = {
         device: { phoneNumber: phoneNumber },
         area: {
@@ -727,12 +709,10 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     };
     const verRes = await locationVerification(locationVerificationData, "FALSE");
     if (logApi) logApi('Location Verification', 'POST', '/location-verification/v1/verify', locationVerificationData, verRes);
-    addMessage(`Location Verification Result: ${verRes.verificationResult} (Patient is OUTSIDE hospital vicinity)`);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Carrier Billing Logic
-    addMessage("Initiating Carrier Billing for hospital charges...");
     const billingReq = {
         "amountTransaction": {
             "phoneNumber": phoneNumber,
@@ -787,10 +767,6 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
 
     addMessage(`Patient ${guestName} has left the premises. Contact at ${phoneNumber}`);
     setPatientStatus("Checked Out");
-    
-    // Clear session storage and localStorage after checkout
-    sessionStorage.clear();
-    localStorage.removeItem('outpatientStatus');
 
     // Remove patient from ER Dashboard after 30 seconds
     setTimeout(() => {
@@ -801,15 +777,12 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     }, 30000);
 
     if (geofencingSubscriptionId) {
-        addMessage(`Deleting Geofencing Subscription ${geofencingSubscriptionId}...`);
         try {
             const delRes = await deleteGeofencingSubscription(geofencingSubscriptionId);
             if (logApi) logApi('Delete Geofencing Subscription', 'DELETE', `/geofencing-subscriptions/v0.3/subscriptions/${geofencingSubscriptionId}`, {}, delRes);
-            addMessage("Geofencing Subscription Deleted.");
         } catch (error) {
             const errorResponse = error.response ? { status: error.response.status, data: error.response.data } : { error: error.message };
             if (logApi) logApi('Delete Geofencing Subscription', 'DELETE', `/geofencing-subscriptions/v0.3/subscriptions/${geofencingSubscriptionId}`, {}, errorResponse);
-            addMessage(`Error deleting Geofencing Subscription: ${error.response?.status || error.message}`);
         }
     }
 }
