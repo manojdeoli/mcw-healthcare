@@ -2,7 +2,7 @@ import axios from 'axios';
 import authService from './auth';
 
 const API_BASE_URL = 'https://network-as-code.p-eu.rapidapi.com/passthrough/camara/v1';
-const API_KEY = '5f2dbafafamsh87b419851b02d59p1c9ce3jsncbbd0bf87a70';
+const API_KEY = 'a1dee25b3dmsh933c9f572c08b1cp1e7225jsna6c0a404fd8e';
 
 
 
@@ -43,7 +43,7 @@ async function ensureValidToken() {
                      localStorage.getItem('activeScreen') || '3',
         verifiedPhoneNumber: localStorage.getItem('verifiedPhoneNumber'),
         outpatientStatus: localStorage.getItem('outpatientStatus'),
-        // Save form state from DOM
+        // Save form state from DOM and localStorage
         formState: {},
         // Save outpatient monitoring state
         monitoringState: {
@@ -85,27 +85,71 @@ async function ensureValidToken() {
     return new Promise(() => {});
 }
 
-export function kycMatch(data) {
-    // return post(`${API_BASE_URL}/kyc-match/kyc-match/v0.2/match`, data);
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const stored = storedKycFillData[data.phoneNumber];
-            if (!stored) {
-                resolve({
-                    nameMatch: 'not_available',
-                    addressMatch: 'not_available',
-                    birthdateMatch: 'not_available',
-                    emailMatch: 'not_available'
-                });
-                return;
+export function kycMatch(data, logApiInteraction) {
+    // Real API call to Nokia KYC Match v0.3
+    const requestBody = {
+        phoneNumber: data.phoneNumber,
+        name: data.name,
+        address: data.address,
+        birthdate: data.birthdate,
+        email: data.email
+    };
+    
+    return post(`${API_BASE_URL}/kyc-match/kyc-match/v0.3/match`, requestBody).then(response => {
+        // Real API call succeeded
+        if (logApiInteraction) {
+            const obscuredRequest = {
+                phoneNumber: data.phoneNumber,
+                name: data.name ? 'XXXXX' : '',
+                address: data.address ? 'XXXXX' : '',
+                email: data.email ? 'XXXXX' : '',
+                birthdate: data.birthdate ? 'XXXXX' : ''
+            };
+            logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.3/match', obscuredRequest, response);
+        }
+        return response;
+    }).catch(error => {
+        // Real API call failed - fallback to mock implementation
+        console.warn('KYC Match API call failed, using mock implementation:', error.message);
+        
+        // Mock implementation fallback
+        const stored = storedKycFillData[data.phoneNumber];
+        if (!stored) {
+            const response = {
+                nameMatch: 'not_available',
+                addressMatch: 'not_available',
+                birthdateMatch: 'not_available',
+                emailMatch: 'not_available'
+            };
+            if (logApiInteraction) {
+                const obscuredRequest = {
+                    phoneNumber: data.phoneNumber,
+                    name: data.name ? 'XXXXX' : '',
+                    address: data.address ? 'XXXXX' : '',
+                    email: data.email ? 'XXXXX' : '',
+                    birthdate: data.birthdate ? 'XXXXX' : ''
+                };
+                logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', obscuredRequest, response);
             }
-            resolve({
-                nameMatch: data.name === stored.name ? 'true' : 'false',
-                addressMatch: data.address === stored.address ? 'true' : 'false',
-                birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false',
-                emailMatch: data.email === stored.email ? 'true' : 'false'
-            });
-        }, 500);
+            return response;
+        }
+        const response = {
+            nameMatch: data.name === stored.name ? 'true' : 'false',
+            addressMatch: data.address === stored.address ? 'true' : 'false',
+            birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false',
+            emailMatch: data.email === stored.email ? 'true' : 'false'
+        };
+        if (logApiInteraction) {
+            const obscuredRequest = {
+                phoneNumber: data.phoneNumber,
+                name: data.name ? 'XXXXX' : '',
+                address: data.address ? 'XXXXX' : '',
+                email: data.email ? 'XXXXX' : '',
+                birthdate: data.birthdate ? 'XXXXX' : ''
+            };
+            logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', obscuredRequest, response);
+        }
+        return response;
     });
 }
 
@@ -312,6 +356,24 @@ const defaultKycData = {
 // Store KYC Fill data for validation
 let storedKycFillData = {};
 
+// Convert date from dd/mm/yyyy to yyyy-mm-dd format for HTML date inputs
+function convertDateFormat(dateString) {
+    if (!dateString) return '';
+    
+    // Check if already in yyyy-mm-dd format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return dateString;
+    }
+    
+    // Convert from dd/mm/yyyy to yyyy-mm-dd
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+        const [day, month, year] = dateString.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    
+    return dateString; // Return as-is if format not recognized
+}
+
 export async function kycFill(phoneNumber) {
     const response = await post(`${API_BASE_URL}/kyc-fill-in/kyc-fill-in/v0.4/fill-in`, { phoneNumber });
     const kycData = {
@@ -320,7 +382,7 @@ export async function kycFill(phoneNumber) {
         name: response.name || '',
         address: response.address || '',
         email: response.email || '',
-        birthdate: response.birthdate || '',
+        birthdate: convertDateFormat(response.birthdate) || '',
         // Obscured version for logging
         _obscured: {
             phoneNumber: response.phoneNumber,
@@ -356,18 +418,18 @@ export function locationRetrieval(phoneNumber, mockCoordinates) {
 }
 
 export function locationVerification(data, mockResult = "TRUE") {
-    return post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data);
-    /* return axios.post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data, {
-        headers: defaultHeaders
-    }).then(response => response.data); */
-    /*return new Promise(resolve => {
-     return new Promise(resolve => {
+    // Use mock implementation like hotel project for consistent demo experience
+    return new Promise(resolve => {
         setTimeout(() => {
-            resolve({
+            const response = {
                 verificationResult: mockResult
-            });
+            };
+            resolve(response);
         }, 500);
-    }); */
+    });
+    
+    // Real API call (commented out for demo consistency)
+    // return post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data);
 }
 
 export function createGeofencingSubscription(phoneNumber, latitude, longitude, radius) {

@@ -103,7 +103,10 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
       if (mapRef.current._leaflet_id) mapRef.current._leaflet_id = null;
-      const map = L.map(mapRef.current).setView([47.48627616952785, 19.07915612501993], 12);
+      // Use hospitalLocation if available, otherwise default to Budapest
+      const initialLat = hospitalLocation?.lat || 47.48627616952785;
+      const initialLng = hospitalLocation?.lng || 19.07915612501993;
+      const map = L.map(mapRef.current).setView([initialLat, initialLng], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
@@ -197,7 +200,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           iconAnchor: [16, 32],
           popupAnchor: [0, -32]
         });
-        L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Wellsoon Hospital - Budapest, Hungary');
+        L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Hospital Location');
 
         L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
           color: 'red',
@@ -282,7 +285,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 47.48627616952785, lng: 19.07915612501993 });
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.3987, lng: 2.1767 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -570,6 +573,7 @@ function App() {
   const syncSetSimulationMode = (val) => { setSimulationMode(val); broadcast('SET_SIMULATION_MODE', val); };
   const syncSetPatientStatus = (val) => { 
     setPatientStatus(val); 
+    localStorage.setItem('patientStatus', val);
     broadcast('SET_PATIENT_STATUS', val);
     // Clear the incoming patient alert when patient is checked in
     if (val === 'Checked In') {
@@ -581,6 +585,7 @@ function App() {
   const syncSetPatientMedicalDetails = (val) => {
     setPatientMedicalDetails(prev => {
         const newData = typeof val === 'function' ? val(prev) : val;
+        localStorage.setItem('patientMedicalDetails', JSON.stringify(newData));
         broadcast('SET_MEDICAL_DETAILS', newData);
         return newData;
     });
@@ -590,9 +595,21 @@ function App() {
     broadcast('SET_ADDITIONAL_PATIENTS', val);
   };
   const syncSetArtificialTime = (val) => { setArtificialTime(val); broadcast('SET_ARTIFICIAL_TIME', val); };
-  const syncSetOutpatientStatus = (val) => { setOutpatientStatus(val); broadcast('SET_OUTPATIENT_STATUS', val); };
-  const syncSetIdentityIntegrity = (val) => { setIdentityIntegrity(val); broadcast('SET_IDENTITY_INTEGRITY', val); };
-  const syncSetRegistrationStatus = (val) => { setRegistrationStatus(val); broadcast('SET_REGISTRATION_STATUS', val); };
+  const syncSetOutpatientStatus = (val) => { 
+    setOutpatientStatus(val); 
+    localStorage.setItem('outpatientStatus', val);
+    broadcast('SET_OUTPATIENT_STATUS', val); 
+  };
+  const syncSetIdentityIntegrity = (val) => { 
+    setIdentityIntegrity(val); 
+    localStorage.setItem('identityIntegrity', val);
+    broadcast('SET_IDENTITY_INTEGRITY', val); 
+  };
+  const syncSetRegistrationStatus = (val) => { 
+    setRegistrationStatus(val); 
+    localStorage.setItem('registrationStatus', val);
+    broadcast('SET_REGISTRATION_STATUS', val); 
+  };
   const syncSetHospitalLocation = (val) => { setHospitalLocation(val); broadcast('SET_HOSPITAL_LOCATION', val); };
   const syncSetInitialUserLocation = (val) => { setInitialUserLocation(val); broadcast('SET_INITIAL_USER_LOCATION', val); };
   const syncSetFormState = (val) => {
@@ -834,12 +851,42 @@ function App() {
     
     // Check if authenticated before proceeding
     if (!authService.isTokenValid()) {
-      // Save app state before re-authentication
+      // Save comprehensive app state before re-authentication
       const appState = {
         activeScreen: activeScreen,
+        verifiedPhoneNumber: verifiedPhoneNumber,
+        outpatientStatus: outpatientStatus,
+        // Save form state from DOM
+        formState: {},
         phoneNumber: fullPhoneNumber,
+        // Save outpatient monitoring state
+        monitoringState: {
+          outpatientStatus: outpatientStatus,
+          shouldResumeMonitoring: localStorage.getItem('shouldResumeMonitoring'),
+          // Save current application state
+          patientStatus: patientStatus,
+          registrationStatus: registrationStatus,
+          identityIntegrity: identityIntegrity,
+          patientMedicalDetails: JSON.stringify(patientMedicalDetails)
+        },
         timestamp: Date.now()
       };
+      
+      // Capture current form values from DOM
+      const formFields = ['name', 'email', 'address', 'birthdate'];
+      formFields.forEach(field => {
+        const element = document.getElementById(field);
+        if (element) {
+          appState.formState[field] = element.value;
+        }
+      });
+      
+      // Save current phone input value
+      const phoneInput = document.getElementById('phone');
+      if (phoneInput) {
+        appState.phoneNumber = phoneInput.value;
+      }
+      
       authService.saveAppState(appState);
       
       const phoneToUse = fullPhoneNumber || '+99999991000';

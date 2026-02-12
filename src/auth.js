@@ -1,4 +1,4 @@
-const API_KEY = '5f2dbafafamsh87b419851b02d59p1c9ce3jsncbbd0bf87a70';
+const API_KEY = 'a1dee25b3dmsh933c9f572c08b1cp1e7225jsna6c0a404fd8e';
 const API_HOST = 'network-as-code.nokia.rapidapi.com';
 const BASE_URL = 'https://network-as-code.p-eu.rapidapi.com';
 

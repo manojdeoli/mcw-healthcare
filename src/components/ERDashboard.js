@@ -6,7 +6,7 @@ import ambulanceIcon from '../ambulance.png';
 import patientIcon from '../patient.png';
 import emergencyRoomBg from '../emergency2.png';
 
-const HOSPITAL_LOCATION = { lat: 47.48627616952785, lng: 19.07915612501993 };
+const HOSPITAL_LOCATION = { lat: 41.3987, lng: 2.1767 };
 
 const mockAdditionalPatients = [
   {
@@ -18,7 +18,7 @@ const mockAdditionalPatients = [
     status: 'URGENT',
     eta: '35 min',
     distance: '17.5 km',
-    location: { lat: 47.520, lng: 19.079 },
+    location: { lat: 41.420, lng: 2.179 },
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -39,7 +39,7 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '42 min',
     distance: '21.0 km',
-    location: { lat: 47.486, lng: 19.040 },
+    location: { lat: 41.386, lng: 2.140 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -60,7 +60,7 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '50 min',
     distance: '25.0 km',
-    location: { lat: 47.450, lng: 19.079 },
+    location: { lat: 41.350, lng: 2.179 },
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',
@@ -78,7 +78,7 @@ const ERDashboard = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patients, setPatients] = useState(mockAdditionalPatients);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 47.48627616952785, lng: 19.07915612501993 });
+  const [hospitalLocation, setHospitalLocation] = useState(HOSPITAL_LOCATION); // Start with default, will be updated from API
   const [showGeofenceCircle, setShowGeofenceCircle] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -199,7 +199,7 @@ const ERDashboard = () => {
       });
       L.marker([hospitalLocation.lat, hospitalLocation.lng], { icon: hospitalMarker })
         .addTo(map)
-        .bindPopup('<strong>Wellsoon Hospital</strong><br>Budapest, Hungary');
+        .bindPopup('<strong>Hospital Location</strong>');
       
       console.log('Hospital marker added at:', hospitalLocation);
       
