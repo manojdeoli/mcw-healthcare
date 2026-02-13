@@ -91,7 +91,7 @@ export function kycMatch(data, logApiInteraction) {
         phoneNumber: data.phoneNumber,
         name: data.name,
         address: data.address,
-        birthdate: data.birthdate,
+        birthdate: data.birthdate, // Keep YYYY-MM-DD format
         email: data.email
     };
     
@@ -136,7 +136,7 @@ export function kycMatch(data, logApiInteraction) {
         const response = {
             nameMatch: data.name === stored.name ? 'true' : 'false',
             addressMatch: data.address === stored.address ? 'true' : 'false',
-            birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false',
+            birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false', // Compare YYYY-MM-DD format
             emailMatch: data.email === stored.email ? 'true' : 'false'
         };
         if (logApiInteraction) {
