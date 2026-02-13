@@ -2,40 +2,90 @@
   position: relative;
   min-height: 100vh;
   width: 100%;
-  background-image: url('../emergency.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   overflow: hidden;
 }
 
-.hospital-monitor {
+.video-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: -1;
+}
+
+.video-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 260px;
+  height: 100px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(240, 248, 255, 0.12));
+  backdrop-filter: blur(25px);
+  border-radius: 0 0 0 20px;
+  z-index: 0;
+}
+
+.monitor-screen::before {
+  content: '';
   position: absolute;
-  top: 8%;
-  right: 22%;
-  width: 650px;
-  height: 480px;
-  z-index: 10;
-  filter: drop-shadow(0 0 20px rgba(0, 150, 255, 0.3));
+  top: -100px;
+  left: 25%;
+  width: 8px;
+  height: 100px;
+  background: linear-gradient(180deg, #666, #333);
+  border-radius: 4px;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.6);
+  z-index: 15;
+}
+
+.monitor-screen::after {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: 25%;
+  width: 8px;
+  height: 100px;
+  background: linear-gradient(180deg, #666, #333);
+  border-radius: 4px;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.6);
+  z-index: 15;
 }
 
 .monitor-screen {
   position: absolute;
-  top: 12%;
-  left: 0.5%;
-  width: 99%;
-  height: 76%;
-  background: #ffffff;
+  top: 8%;
+  right: 30%;
+  width: 620px;
+  height: 450px;
+  background: rgba(255, 255, 255, 0.95);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 
     inset 0 0 20px rgba(0, 0, 0, 0.5),
     0 0 30px rgba(0, 150, 255, 0.2),
     0 0 60px rgba(0, 150, 255, 0.1),
     inset 0 0 50px rgba(0, 150, 255, 0.05);
   border: 2px solid #333;
-  cursor: pointer;
   transition: all 0.3s ease;
+  z-index: 10;
+  filter: drop-shadow(0 0 20px rgba(0, 150, 255, 0.3));
+  transform: rotateX(-15deg);
+  transform-origin: bottom center;
+}
+
+.monitor-screen:before:before {
+  content: '';
+  position: absolute;
+  top: -110px;
+  left: 25%;
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle, #444, #222);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  z-index: 16;
 }
 
 .monitor-screen:hover {
@@ -136,7 +186,7 @@
 
 .er-main {
   display: grid;
-  grid-template-columns: 1.5fr 0.8fr;
+  grid-template-columns: 1.2fr 1fr;
   gap: 0.3rem;
   height: calc(100% - 40px);
 }

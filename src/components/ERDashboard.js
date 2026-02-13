@@ -5,7 +5,6 @@ import 'leaflet/dist/leaflet.css';
 import ambulanceIcon from '../ambulance.png';
 import patientIcon from '../patient.png';
 import emergencyRoomBg from '../emergency.png';
-import screenImage from '../screen.png';
 
 const HOSPITAL_LOCATION = { lat: 41.3987, lng: 2.1767 };
 
@@ -83,7 +82,6 @@ const ERDashboard = () => {
   const [showGeofenceCircle, setShowGeofenceCircle] = useState(false);
   const [currentPatientIndex, setCurrentPatientIndex] = useState(0);
   const [showDetailCard, setShowDetailCard] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const channelRef = useRef(null);
@@ -275,10 +273,22 @@ const ERDashboard = () => {
 
   return (
     <div className="er-dashboard">
-      {/* Hospital Monitor */}
-      <div className="hospital-monitor">
-        <img src={screenImage} alt="Hospital Monitor" style={{ width: '100%', height: '100%' }} />
-        <div className={`monitor-screen ${isExpanded ? 'expanded' : ''}`} onClick={() => setIsExpanded(!isExpanded)}>
+      {/* Fullscreen Video Background */}
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline
+        className="video-background"
+      >
+        <source src="/Hospital_ER_Video.mp4" type="video/mp4" />
+      </video>
+      
+      {/* Overlay to hide watermark */}
+      <div className="video-overlay"></div>
+      
+      {/* Monitor Content Overlay */}
+      <div className="monitor-screen">
           <div className="monitor-content">
             <div className="er-content">
               <div className="er-header">
@@ -476,7 +486,7 @@ const ERDashboard = () => {
                 <div className="er-sidebar">
                   <div className="map-panel">
                     <h3>Live Patient Tracking</h3>
-                    <div ref={mapRef} style={{ height: '180px', width: '100%', borderRadius: '4px' }}></div>
+                    <div ref={mapRef} style={{ height: '250px', width: '100%', borderRadius: '4px' }}></div>
                   </div>
 
                   <div className="resource-panel">
@@ -504,8 +514,6 @@ const ERDashboard = () => {
               </div>
             </div>
           </div>
-        </div>
-        
         {/* Patient Detail Card Popup within Monitor */}
         {showDetailCard && selectedPatient && (
           <div style={{
