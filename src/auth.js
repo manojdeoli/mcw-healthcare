@@ -1,4 +1,4 @@
-const API_KEY = '5f2dbafafamsh87b419851b02d59p1c9ce3jsncbbd0bf87a70';
+const API_KEY = 'a1dee25b3dmsh933c9f572c08b1cp1e7225jsna6c0a404fd8e';
 const API_HOST = 'network-as-code.nokia.rapidapi.com';
 const BASE_URL = 'https://network-as-code.p-eu.rapidapi.com';
 
@@ -8,6 +8,16 @@ class AuthService {
         this.clientCredentials = null;
         this.endpoints = null;
         this.tokenExpiresAt = null;
+        this.isAuthenticating = false;
+        
+        // Restore token from localStorage on initialization
+        const savedToken = localStorage.getItem('access_token');
+        const savedExpiry = localStorage.getItem('token_expires_at');
+        if (savedToken && savedExpiry) {
+            this.accessToken = savedToken;
+            this.tokenExpiresAt = parseInt(savedExpiry, 10);
+            console.log('💾 Restored token from localStorage');
+        }
     }
 
     getTimeUntilExpiry() {
@@ -19,7 +29,13 @@ class AuthService {
     isTokenValid() {
         if (!this.accessToken || !this.tokenExpiresAt) return false;
         const buffer = 30000; // 30 seconds buffer
-        return Date.now() < (this.tokenExpiresAt - buffer);
+        const isValid = Date.now() < (this.tokenExpiresAt - buffer);
+        if (!isValid) {
+            // Clear expired token from localStorage
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('token_expires_at');
+        }
+        return isValid;
     }
 
     saveAppState(state) {
@@ -78,7 +94,8 @@ class AuthService {
             throw new Error('Must call getClientCredentials and getEndpoints first');
         }
 
-        const redirectUri = window.location.origin + '/redirect';
+        const port = window.location.port || '3003';
+        const redirectUri = `http://localhost:${port}/redirect`;
 
         const params = new URLSearchParams({
             scope: 'number-verification:verify',
@@ -89,7 +106,7 @@ class AuthService {
         });
 
         const authUrl = `${this.endpoints.authorization_endpoint}?${params.toString()}`;
-        console.log('🔗 Step 3: Authorization URL generated:', authUrl);
+        console.log('🔗 Step 3: Authorization URL generated');
         return { authUrl, redirectUri };
     }
 
@@ -132,9 +149,14 @@ class AuthService {
 
             if (response.ok) {
                 const result = JSON.parse(responseText);
-                console.log('✅ Token received via backend:', result);
+                console.log('✅ Token received');
                 this.accessToken = result.access_token;
                 this.tokenExpiresAt = Date.now() + (result.expires_in * 1000);
+                
+                // Persist token to localStorage
+                localStorage.setItem('access_token', result.access_token);
+                localStorage.setItem('token_expires_at', this.tokenExpiresAt.toString());
+                
                 return result;
             }
         } catch (error) {
@@ -152,7 +174,7 @@ class AuthService {
     }
 
     isAuthenticated() {
-        return !!this.accessToken;
+        return this.isTokenValid();
     }
 
     extractCodeFromUrl(urlString) {
@@ -216,15 +238,18 @@ class AuthService {
     }
 
     async authenticate(phoneNumber) {
+        if (this.isAuthenticating) {
+            console.log('⚠️ Authentication already in progress, skipping...');
+            return new Promise(() => {});
+        }
+        
+        this.isAuthenticating = true;
+        
         try {
             await this.getClientCredentials();
             await this.getEndpoints();
             
             const { authUrl, redirectUri } = this.getAuthorizationUrl(phoneNumber);
-            
-            localStorage.setItem('auth_url_step3', authUrl);
-            console.log('🔗 Step 3 Authorization URL:', authUrl);
-            console.log('📋 URL saved to localStorage for reference');
             
             sessionStorage.setItem('auth_phone', phoneNumber);
             sessionStorage.setItem('auth_redirect_uri', redirectUri);
@@ -235,44 +260,48 @@ class AuthService {
             
             return new Promise(() => {});
         } catch (error) {
+            this.isAuthenticating = false;
             throw new Error(`Authentication failed: ${error.message}`);
         }
     }
 
-    // Check if we're returning from auth and need to handle the code
     async checkAndHandleCallback() {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         
+        console.log('🔍 Checking for OAuth callback...', { code, url: window.location.href });
+        
         if (code) {
             console.log('✅ Code found in URL:', code);
             
-            // Restore credentials and endpoints from sessionStorage
             const credStr = sessionStorage.getItem('auth_credentials');
             const endStr = sessionStorage.getItem('auth_endpoints');
             const authPhone = sessionStorage.getItem('auth_phone');
             const redirectUri = sessionStorage.getItem('auth_redirect_uri');
             
+            console.log('📦 Session data:', { hasCredentials: !!credStr, hasEndpoints: !!endStr, authPhone, redirectUri });
+            
             if (credStr && endStr && authPhone) {
                 this.clientCredentials = JSON.parse(credStr);
                 this.endpoints = JSON.parse(endStr);
-                console.log('✅ Restored credentials and endpoints');
                 
-                // Clean URL immediately to prevent reprocessing
                 window.history.replaceState({}, document.title, window.location.pathname);
                 
                 try {
                     const tokenData = await this.exchangeCodeForToken(code, redirectUri);
-                    
-                    // Clear session storage
                     sessionStorage.clear();
-                    
+                    this.isAuthenticating = false;
+                    console.log('✅ Authentication complete!');
                     return { success: true, phoneNumber: authPhone, tokenData };
                 } catch (error) {
                     console.log('❌ Token exchange failed:', error);
                     sessionStorage.clear();
+                    this.isAuthenticating = false;
                     return { error: error.message };
                 }
+            } else {
+                console.log('❌ Missing session data - authentication state lost');
+                this.isAuthenticating = false;
             }
         }
         

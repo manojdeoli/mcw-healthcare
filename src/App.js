@@ -103,7 +103,10 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
       if (mapRef.current._leaflet_id) mapRef.current._leaflet_id = null;
-      const map = L.map(mapRef.current).setView([47.48627616952785, 19.07915612501993], 12);
+      // Use hospitalLocation if available, otherwise default to Budapest
+      const initialLat = hospitalLocation?.lat || 47.48627616952785;
+      const initialLng = hospitalLocation?.lng || 19.07915612501993;
+      const map = L.map(mapRef.current).setView([initialLat, initialLng], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
@@ -197,7 +200,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           iconAnchor: [16, 32],
           popupAnchor: [0, -32]
         });
-        L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Wellsoon Hospital - Budapest, Hungary');
+        L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Hospital Location');
 
         L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
           color: 'red',
@@ -258,9 +261,10 @@ const ApiLogsView = ({ apiLogs, onClear, maxHeight }) => (
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authError, setAuthError] = useState('');
   const [tokenExpirySeconds, setTokenExpirySeconds] = useState(null);
+  const authCheckExecuted = useRef(false);
   const [activeScreen, setActiveScreen] = useState(() => {
     const saved = localStorage.getItem('activeScreen');
     return saved ? parseInt(saved) : 1;
@@ -281,7 +285,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 47.48627616952785, lng: 19.07915612501993 });
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.3987, lng: 2.1767 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -300,101 +304,170 @@ function App() {
   
   // Initialize authentication on app start
   useEffect(() => {
-    console.log('🚀 App mounted, checking for auth callback...');
+    // Prevent double execution in StrictMode
+    if (authCheckExecuted.current) {
+      console.log('⚠️ Auth check already executed, skipping...');
+      return;
+    }
+    authCheckExecuted.current = true;
     
-    const step3Url = localStorage.getItem('auth_url_step3');
-    if (step3Url) {
-      console.log('📝 Step 3 Authorization URL (from previous session):', step3Url);
+    console.log('🚀 App mounted, checking authentication...');
+    
+    // Redirect from /redirect to / if no code
+    if (window.location.pathname === '/redirect' && !window.location.search.includes('code=')) {
+      console.log('⚠️ On /redirect without code, redirecting to /');
+      window.location.href = '/';
+      return;
     }
     
     const checkAuth = async () => {
       const authResult = await authService.checkAndHandleCallback();
       
-      console.log('📝 Auth result:', authResult);
-      
       if (authResult) {
         if (authResult.success) {
           setIsAuthenticated(true);
-          setVerifiedPhoneNumber(authResult.phoneNumber);
-          localStorage.setItem('verifiedPhoneNumber', authResult.phoneNumber);
-          localStorage.removeItem('auth_url_step3');
+          setAuthError('');
           localStorage.setItem('has_authenticated', 'true');
-          broadcast('SET_VERIFIED_PHONE', authResult.phoneNumber);
+          sessionStorage.removeItem('auth_in_progress');
+          console.log('✅ Authentication successful, token set');
           
-          // Check if we need to resume verification
-          const shouldResume = localStorage.getItem('shouldResumeVerification');
-          const pendingPhone = localStorage.getItem('pendingPhoneVerification');
-          if (shouldResume === 'true' && pendingPhone) {
-            localStorage.removeItem('shouldResumeVerification');
-            // Trigger verification after a short delay to let state settle
-            setTimeout(() => {
-              const verifyBtn = document.getElementById('verifyBtn');
-              if (verifyBtn) verifyBtn.click();
-            }, 100);
-          }
-          
-          // Check if we need to resume monitoring
-          const shouldResumeMonitoring = localStorage.getItem('shouldResumeMonitoring');
-          if (shouldResumeMonitoring === 'true') {
-            // Trigger monitoring after a short delay to let state settle
-            setTimeout(() => {
-              const monitoringBtns = document.querySelectorAll('button');
-              monitoringBtns.forEach(btn => {
-                if (btn.textContent === 'Start Monitoring') {
-                  btn.click();
+          // Restore app state after re-authentication
+          const savedState = authService.restoreAppState();
+          if (savedState && savedState.activeScreen) {
+            console.log('💾 Restoring app state:', savedState);
+            setActiveScreen(parseInt(savedState.activeScreen));
+            localStorage.setItem('activeScreen', savedState.activeScreen.toString());
+            
+            // Restore outpatient monitoring state
+            if (savedState.monitoringState) {
+              if (savedState.monitoringState.outpatientStatus) {
+                syncSetOutpatientStatus(savedState.monitoringState.outpatientStatus);
+              }
+              if (savedState.monitoringState.shouldResumeMonitoring) {
+                localStorage.setItem('shouldResumeMonitoring', savedState.monitoringState.shouldResumeMonitoring);
+              }
+              // Restore other application state
+              if (savedState.monitoringState.patientStatus) {
+                syncSetPatientStatus(savedState.monitoringState.patientStatus);
+              }
+              if (savedState.monitoringState.registrationStatus) {
+                syncSetRegistrationStatus(savedState.monitoringState.registrationStatus);
+              }
+              if (savedState.monitoringState.identityIntegrity) {
+                syncSetIdentityIntegrity(savedState.monitoringState.identityIntegrity);
+              }
+              if (savedState.monitoringState.patientMedicalDetails) {
+                try {
+                  const medicalDetails = JSON.parse(savedState.monitoringState.patientMedicalDetails);
+                  syncSetPatientMedicalDetails(medicalDetails);
+                } catch (e) {
+                  console.warn('Failed to restore patient medical details:', e);
                 }
-              });
-            }, 100);
-          }
-          
-          // Restore outpatient monitoring status
-          const savedOutpatientStatus = localStorage.getItem('outpatientStatus');
-          if (savedOutpatientStatus && savedOutpatientStatus !== 'Inactive') {
-            syncSetOutpatientStatus(savedOutpatientStatus);
+              }
+            }
+            
+            // Restore phone number if it was saved
+            if (savedState.phoneNumber) {
+              setPhone(savedState.phoneNumber);
+              // Auto-trigger phone verification after re-authentication
+              setTimeout(() => {
+                const verifyBtn = document.getElementById('verifyBtn');
+                if (verifyBtn && !sessionStorage.getItem('verify_triggered')) {
+                  sessionStorage.setItem('verify_triggered', 'true');
+                  verifyBtn.click();
+                  // Clear flag after 2 seconds
+                  setTimeout(() => sessionStorage.removeItem('verify_triggered'), 2000);
+                }
+              }, 500);
+            }
+            
+            // Auto-resume outpatient monitoring if it was active
+            if (savedState.monitoringState?.shouldResumeMonitoring) {
+              setTimeout(() => {
+                const monitoringBtn = document.querySelector('#outpatientMonitoring .btn-primary');
+                if (monitoringBtn && !sessionStorage.getItem('monitoring_triggered')) {
+                  sessionStorage.setItem('monitoring_triggered', 'true');
+                  monitoringBtn.click();
+                  setTimeout(() => sessionStorage.removeItem('monitoring_triggered'), 2000);
+                }
+              }, 1000);
+            }
+            // Restore form state if it was saved
+            if (savedState.formState) {
+              console.log('💾 Restoring form state:', savedState.formState);
+              syncSetFormState(savedState.formState);
+              // Also populate DOM elements directly
+              setTimeout(() => {
+                Object.keys(savedState.formState).forEach(field => {
+                  const element = document.getElementById(field);
+                  if (element) {
+                    element.value = savedState.formState[field];
+                  }
+                });
+              }, 100);
+            }
           }
         } else if (authResult.error) {
           setAuthError(authResult.error);
+          localStorage.removeItem('has_authenticated');
+          sessionStorage.removeItem('auth_in_progress');
         }
+        setIsAuthenticating(false);
         return;
       }
       
       if (authService.isAuthenticated()) {
         console.log('✅ Token still valid, restoring authentication state');
         setIsAuthenticated(true);
+        setIsAuthenticating(false);
+        sessionStorage.removeItem('auth_in_progress');
         return;
       }
       
-      // Auto-authenticate only on first visit
+      // Check if authentication is already in progress
+      if (sessionStorage.getItem('auth_in_progress')) {
+        console.log('⚠️ Authentication already in progress, skipping...');
+        setIsAuthenticating(false);
+        return;
+      }
+      
+      // Auto-authenticate only on first visit (when flag doesn't exist)
       const hasAuthenticated = localStorage.getItem('has_authenticated');
-      console.log('🔍 Checking has_authenticated flag:', hasAuthenticated);
       if (!hasAuthenticated) {
         console.log('🔐 First visit - triggering auto-authentication');
+        sessionStorage.setItem('auth_in_progress', 'true');
         const phoneToUse = '+99999991000';
-        setPhone(phoneToUse);
         setTimeout(async () => {
           try {
             await authService.authenticate(phoneToUse);
           } catch (error) {
             console.error('Auto-authentication failed:', error);
+            setAuthError(error.message);
+            sessionStorage.removeItem('auth_in_progress');
+            setIsAuthenticating(false);
           }
         }, 100);
+      } else {
+        console.log('⚠️ Token expired but has_authenticated flag exists - user needs to re-verify');
+        sessionStorage.removeItem('auth_in_progress');
+        setIsAuthenticating(false);
       }
     };
     
     checkAuth();
   }, []);
 
+  // Token expiry countdown
   useEffect(() => {
-    if (isAuthenticated) {
-      const interval = setInterval(() => {
-        const seconds = authService.getTimeUntilExpiry();
-        setTokenExpirySeconds(seconds);
-        if (seconds === 0) {
-          setIsAuthenticated(false);
-        }
-      }, 1000);
-      return () => clearInterval(interval);
-    }
+    if (!isAuthenticated) return;
+    const interval = setInterval(() => {
+      const seconds = authService.getTimeUntilExpiry();
+      setTokenExpirySeconds(seconds);
+      if (seconds <= 0) {
+        setIsAuthenticated(false);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
   }, [isAuthenticated]);
 
   // --- Broadcast Channel for Cross-Tab Sync ---
@@ -500,6 +573,7 @@ function App() {
   const syncSetSimulationMode = (val) => { setSimulationMode(val); broadcast('SET_SIMULATION_MODE', val); };
   const syncSetPatientStatus = (val) => { 
     setPatientStatus(val); 
+    localStorage.setItem('patientStatus', val);
     broadcast('SET_PATIENT_STATUS', val);
     // Clear the incoming patient alert when patient is checked in
     if (val === 'Checked In') {
@@ -511,6 +585,7 @@ function App() {
   const syncSetPatientMedicalDetails = (val) => {
     setPatientMedicalDetails(prev => {
         const newData = typeof val === 'function' ? val(prev) : val;
+        localStorage.setItem('patientMedicalDetails', JSON.stringify(newData));
         broadcast('SET_MEDICAL_DETAILS', newData);
         return newData;
     });
@@ -520,9 +595,21 @@ function App() {
     broadcast('SET_ADDITIONAL_PATIENTS', val);
   };
   const syncSetArtificialTime = (val) => { setArtificialTime(val); broadcast('SET_ARTIFICIAL_TIME', val); };
-  const syncSetOutpatientStatus = (val) => { setOutpatientStatus(val); broadcast('SET_OUTPATIENT_STATUS', val); };
-  const syncSetIdentityIntegrity = (val) => { setIdentityIntegrity(val); broadcast('SET_IDENTITY_INTEGRITY', val); };
-  const syncSetRegistrationStatus = (val) => { setRegistrationStatus(val); broadcast('SET_REGISTRATION_STATUS', val); };
+  const syncSetOutpatientStatus = (val) => { 
+    setOutpatientStatus(val); 
+    localStorage.setItem('outpatientStatus', val);
+    broadcast('SET_OUTPATIENT_STATUS', val); 
+  };
+  const syncSetIdentityIntegrity = (val) => { 
+    setIdentityIntegrity(val); 
+    localStorage.setItem('identityIntegrity', val);
+    broadcast('SET_IDENTITY_INTEGRITY', val); 
+  };
+  const syncSetRegistrationStatus = (val) => { 
+    setRegistrationStatus(val); 
+    localStorage.setItem('registrationStatus', val);
+    broadcast('SET_REGISTRATION_STATUS', val); 
+  };
   const syncSetHospitalLocation = (val) => { setHospitalLocation(val); broadcast('SET_HOSPITAL_LOCATION', val); };
   const syncSetInitialUserLocation = (val) => { setInitialUserLocation(val); broadcast('SET_INITIAL_USER_LOCATION', val); };
   const syncSetFormState = (val) => {
@@ -697,8 +784,12 @@ function App() {
     }
     
     try {
-      await authService.authenticate(phoneToUse);
+      const tokenData = await authService.authenticate(phoneToUse);
       setIsAuthenticated(true);
+      setVerifiedPhoneNumber(phoneToUse);
+      localStorage.setItem('verifiedPhoneNumber', phoneToUse);
+      broadcast('SET_VERIFIED_PHONE', phoneToUse);
+      addMessage('Authentication completed successfully!');
     } catch (error) {
       console.error('Authentication failed:', error);
       setAuthError(`Authentication failed: ${error.message}`);
@@ -710,40 +801,44 @@ function App() {
   const validatePhone = async (e) => {
     e.preventDefault();
     
-    // Clear session storage and localStorage when starting new verification
-    sessionStorage.clear();
-    localStorage.removeItem('outpatientStatus');
+    // Don't reset state if this is an auto-triggered verification during monitoring resume
+    const isMonitoringResume = sessionStorage.getItem('monitoring_triggered');
     
-    // Reset all application state to defaults when starting new verification
-    syncSetRegistrationStatus('Not Registered');
-    syncSetIdentityIntegrity('Bad');
-    syncSetPatientStatus('Not Checked In');
-    syncSetPaymentStatus('Not Paid');
-    syncSetGeofencingSubscriptionId(null);
-    syncSetOutpatientStatus('Inactive');
-    syncSetUserGps(null);
-    syncSetInitialUserLocation(null);
-    syncSetLastIntegrityCheckTime(null);
-    syncSetPatientMedicalDetails({
-      patientId: '',
-      esi: '',
-      vitals: '',
-      complaint: '',
-      eta: '',
-      medicalHistory: '',
-      treatmentNeeds: { specialists: [], equipment: [] },
-    });
-    syncSetAdditionalPatients([]);
-    syncSetKycMatchResponse(null);
-    syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
-    syncSetArtificialTime(null);
-    setSuccess('');
-    syncSetSimulationMode('arrival');
-    
-    // Clear activity logs and API logs
-    setMessages([]);
-    setApiLogs([]);
-    
+    if (!isMonitoringResume) {
+      // Clear session storage and localStorage when starting new verification
+      sessionStorage.clear();
+      localStorage.removeItem('outpatientStatus');
+      
+      // Reset all application state to defaults when starting new verification
+      syncSetRegistrationStatus('Not Registered');
+      syncSetIdentityIntegrity('Bad');
+      syncSetPatientStatus('Not Checked In');
+      syncSetPaymentStatus('Not Paid');
+      syncSetGeofencingSubscriptionId(null);
+      syncSetOutpatientStatus('Inactive');
+      syncSetUserGps(null);
+      syncSetInitialUserLocation(null);
+      syncSetLastIntegrityCheckTime(null);
+      syncSetPatientMedicalDetails({
+        patientId: '',
+        esi: '',
+        vitals: '',
+        complaint: '',
+        eta: '',
+        medicalHistory: '',
+        treatmentNeeds: { specialists: [], equipment: [] },
+      });
+      syncSetAdditionalPatients([]);
+      syncSetKycMatchResponse(null);
+      syncSetFormState(formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
+      syncSetArtificialTime(null);
+      setSuccess('');
+      syncSetSimulationMode('arrival');
+      
+      // Clear activity logs and API logs
+      setMessages([]);
+      setApiLogs([]);
+    }
     const fullPhoneNumber = phone.replace(/\s/g, '');
     const regex = /^\+\d{10,15}$/
     setError('');
@@ -754,10 +849,52 @@ function App() {
       return;
     }
     
-    // Save current screen and phone number before verification
-    localStorage.setItem('activeScreen', activeScreen.toString());
-    localStorage.setItem('pendingPhoneVerification', fullPhoneNumber);
-    localStorage.setItem('shouldResumeVerification', 'true');
+    // Check if authenticated before proceeding
+    if (!authService.isTokenValid()) {
+      // Save comprehensive app state before re-authentication
+      const appState = {
+        activeScreen: activeScreen,
+        verifiedPhoneNumber: verifiedPhoneNumber,
+        outpatientStatus: outpatientStatus,
+        // Save form state from DOM
+        formState: {},
+        phoneNumber: fullPhoneNumber,
+        // Save outpatient monitoring state
+        monitoringState: {
+          outpatientStatus: outpatientStatus,
+          shouldResumeMonitoring: localStorage.getItem('shouldResumeMonitoring'),
+          // Save current application state
+          patientStatus: patientStatus,
+          registrationStatus: registrationStatus,
+          identityIntegrity: identityIntegrity,
+          patientMedicalDetails: JSON.stringify(patientMedicalDetails)
+        },
+        timestamp: Date.now()
+      };
+      
+      // Capture current form values from DOM
+      const formFields = ['name', 'email', 'address', 'birthdate'];
+      formFields.forEach(field => {
+        const element = document.getElementById(field);
+        if (element) {
+          appState.formState[field] = element.value;
+        }
+      });
+      
+      // Save current phone input value
+      const phoneInput = document.getElementById('phone');
+      if (phoneInput) {
+        appState.phoneNumber = phoneInput.value;
+      }
+      
+      authService.saveAppState(appState);
+      
+      const phoneToUse = fullPhoneNumber || '+99999991000';
+      setTimeout(() => {
+        authService.authenticate(phoneToUse);
+      }, 100);
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -769,7 +906,6 @@ function App() {
         setSuccess('Phone number is verified.');
         setVerifiedPhoneNumber(fullPhoneNumber);
         localStorage.setItem('verifiedPhoneNumber', fullPhoneNumber);
-        localStorage.removeItem('pendingPhoneVerification');
         broadcast('SET_VERIFIED_PHONE', fullPhoneNumber);
       } else {
         setError(`Phone number verification failed.`);
@@ -778,8 +914,8 @@ function App() {
         broadcast('SET_VERIFIED_PHONE', null);
       }
     } catch (err) {
-      console.error('API call failed:', err);
-      setError('An error occurred during verification. Please try again.');
+      console.error('Phone verification failed:', err);
+      setError('Phone verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -996,12 +1132,14 @@ function App() {
       return;
     }
     
-    // Clear the flag first to prevent auto-resume on refresh
-    localStorage.removeItem('shouldResumeMonitoring');
-    
-    // Save current screen and flag to resume monitoring after OAuth
+    // Save current state before starting monitoring
     localStorage.setItem('activeScreen', activeScreen.toString());
     localStorage.setItem('shouldResumeMonitoring', 'true');
+    localStorage.setItem('outpatientStatus', 'Initializing...');
+    localStorage.setItem('patientStatus', patientStatus);
+    localStorage.setItem('registrationStatus', registrationStatus);
+    localStorage.setItem('identityIntegrity', identityIntegrity);
+    localStorage.setItem('patientMedicalDetails', JSON.stringify(patientMedicalDetails));
     
     syncSetArtificialTime(new Date());
     setIsSequenceRunning(true);
@@ -1020,13 +1158,15 @@ function App() {
 
         await api.startOutpatientMonitoringSequence(phone, startLoc, addMessage, syncSetLocation, syncSetUserGps, syncSetOutpatientStatus, syncSetArtificialTime, logApiInteraction);
         
-        // Clear the flag after monitoring starts successfully
+        // Clear the flag after monitoring completes successfully
         localStorage.removeItem('shouldResumeMonitoring');
+        localStorage.removeItem('outpatientStatus');
     } catch (e) {
         console.error(e);
         addMessage("Error in monitoring sequence: " + e.message);
-        // Clear flag on error too
+        // Clear flags on error too
         localStorage.removeItem('shouldResumeMonitoring');
+        localStorage.removeItem('outpatientStatus');
     }
   };
 
