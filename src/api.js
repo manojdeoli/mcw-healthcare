@@ -635,7 +635,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         area: {
             areaType: "CIRCLE",
             center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng },
-            radius: 200  // Increased radius to 200m for better verification success
+            radius: 10000  // 10km radius for verification
         }
     };
 

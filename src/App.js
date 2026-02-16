@@ -103,9 +103,9 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
       if (mapRef.current._leaflet_id) mapRef.current._leaflet_id = null;
-      // Use hospitalLocation if available, otherwise default to Barcelona
-      const initialLat = hospitalLocation?.lat || 41.41146666962281;
-      const initialLng = hospitalLocation?.lng || 2.203629421910704;
+      // Use hospitalLocation if available, otherwise default to Barcelona west
+      const initialLat = hospitalLocation?.lat || 41.3874;
+      const initialLng = hospitalLocation?.lng || 2.1686;
       const map = L.map(mapRef.current).setView([initialLat, initialLng], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -285,7 +285,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.41146666962281, lng: 2.203629421910704 });
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.3874, lng: 2.1686 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -1034,8 +1034,8 @@ function App() {
           lng: patientLocationData.area.center.longitude
         };
         
-        // Hospital location is fixed in Barcelona
-        const fixedHospitalCoords = { lat: 41.41146666962281, lng: 2.203629421910704 };
+        // Hospital location is fixed in Barcelona (west side)
+        const fixedHospitalCoords = { lat: 41.3874, lng: 2.1686 };
         syncSetHospitalLocation(fixedHospitalCoords);
         
         // Broadcast hospital location to ER Dashboard
