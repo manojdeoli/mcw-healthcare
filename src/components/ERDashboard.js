@@ -16,10 +16,10 @@ const mockAdditionalPatients = [
     age: 45,
     esi: 2,
     status: 'URGENT',
-    eta: '35 min',
-    distance: '17.5 km',
-    location: { lat: 41.360, lng: 2.180 }, // South-East of hospital
-    initialLocation: { lat: 41.360, lng: 2.180 },
+    eta: '55 min',
+    distance: '27.5 km',
+    location: { lat: 41.430, lng: 2.220 }, // North-East of hospital (farther)
+    initialLocation: { lat: 41.430, lng: 2.220 },
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -38,10 +38,10 @@ const mockAdditionalPatients = [
     age: 28,
     esi: 3,
     status: 'MODERATE',
-    eta: '42 min',
-    distance: '21.0 km',
-    location: { lat: 41.400, lng: 2.140 }, // West of hospital
-    initialLocation: { lat: 41.400, lng: 2.140 },
+    eta: '62 min',
+    distance: '31.0 km',
+    location: { lat: 41.395, lng: 2.110 }, // West of hospital (farther)
+    initialLocation: { lat: 41.395, lng: 2.110 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -60,10 +60,10 @@ const mockAdditionalPatients = [
     age: 52,
     esi: 3,
     status: 'MODERATE',
-    eta: '50 min',
-    distance: '25.0 km',
-    location: { lat: 41.370, lng: 2.150 }, // South of hospital
-    initialLocation: { lat: 41.370, lng: 2.150 },
+    eta: '70 min',
+    distance: '35.0 km',
+    location: { lat: 41.340, lng: 2.120 }, // South-West of hospital (farther)
+    initialLocation: { lat: 41.340, lng: 2.120 },
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',
@@ -128,12 +128,12 @@ const ERDashboard = () => {
             let newEta, newLocation;
             if (currentEta <= 5) {
               // Reset to starting position when very close to hospital
-              const newEta = Math.floor(Math.random() * 20) + 35;
-              // Generate random starting position around hospital
+              const newEta = Math.floor(Math.random() * 20) + 55;
+              // Generate random starting position around hospital (farther)
               const directions = [
-                { lat: 41.360, lng: 2.180 },  // South-East
-                { lat: 41.400, lng: 2.140 },  // West
-                { lat: 41.370, lng: 2.150 }   // South
+                { lat: 41.430, lng: 2.220 },  // North-East
+                { lat: 41.395, lng: 2.110 },  // West
+                { lat: 41.340, lng: 2.120 }   // South-West
               ];
               const randomDirection = directions[Math.floor(Math.random() * directions.length)];
               newLocation = randomDirection;
