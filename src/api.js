@@ -86,33 +86,22 @@ async function ensureValidToken() {
 }
 
 export function kycMatch(data, logApiInteraction) {
-    // Real API call to Nokia KYC Match v0.3
     const requestBody = {
         phoneNumber: data.phoneNumber,
         name: data.name,
         address: data.address,
-        birthdate: data.birthdate, // Keep YYYY-MM-DD format
+        birthdate: data.birthdate,
         email: data.email
     };
     
     return post(`${API_BASE_URL}/kyc-match/kyc-match/v0.3/match`, requestBody).then(response => {
-        // Real API call succeeded
         if (logApiInteraction) {
-            const obscuredRequest = {
-                phoneNumber: data.phoneNumber,
-                name: data.name ? 'XXXXX' : '',
-                address: data.address ? 'XXXXX' : '',
-                email: data.email ? 'XXXXX' : '',
-                birthdate: data.birthdate ? 'XXXXX' : ''
-            };
-            logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.3/match', obscuredRequest, response);
+            logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.3/match', requestBody, response);
         }
         return response;
     }).catch(error => {
-        // Real API call failed - fallback to mock implementation
         console.warn('KYC Match API call failed, using mock implementation:', error.message);
         
-        // Mock implementation fallback
         const stored = storedKycFillData[data.phoneNumber];
         if (!stored) {
             const response = {
@@ -122,32 +111,18 @@ export function kycMatch(data, logApiInteraction) {
                 emailMatch: 'not_available'
             };
             if (logApiInteraction) {
-                const obscuredRequest = {
-                    phoneNumber: data.phoneNumber,
-                    name: data.name ? 'XXXXX' : '',
-                    address: data.address ? 'XXXXX' : '',
-                    email: data.email ? 'XXXXX' : '',
-                    birthdate: data.birthdate ? 'XXXXX' : ''
-                };
-                logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', obscuredRequest, response);
+                logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', requestBody, response);
             }
             return response;
         }
         const response = {
             nameMatch: data.name === stored.name ? 'true' : 'false',
             addressMatch: data.address === stored.address ? 'true' : 'false',
-            birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false', // Compare YYYY-MM-DD format
+            birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false',
             emailMatch: data.email === stored.email ? 'true' : 'false'
         };
         if (logApiInteraction) {
-            const obscuredRequest = {
-                phoneNumber: data.phoneNumber,
-                name: data.name ? 'XXXXX' : '',
-                address: data.address ? 'XXXXX' : '',
-                email: data.email ? 'XXXXX' : '',
-                birthdate: data.birthdate ? 'XXXXX' : ''
-            };
-            logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', obscuredRequest, response);
+            logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', requestBody, response);
         }
         return response;
     });
@@ -382,29 +357,10 @@ export async function kycFill(phoneNumber) {
         name: response.name || '',
         address: response.address || '',
         email: response.email || '',
-        birthdate: convertDateFormat(response.birthdate) || '',
-        // Obscured version for logging
-        _obscured: {
-            phoneNumber: response.phoneNumber,
-            idDocument: response.idDocument,
-            name: response.name ? 'XXXXX' : '',
-            address: response.address ? 'XXXXX' : '',
-            email: response.email ? 'XXXXX' : '',
-            birthdate: response.birthdate ? 'XXXXX' : ''
-        }
+        birthdate: convertDateFormat(response.birthdate) || ''
     };
     storedKycFillData[phoneNumber] = kycData;
     return kycData;
-}
-
-export function obscureKycRequest(data) {
-    return {
-        phoneNumber: data.phoneNumber,
-        name: data.name ? 'XXXXX' : '',
-        address: data.address ? 'XXXXX' : '',
-        email: data.email ? 'XXXXX' : '',
-        birthdate: data.birthdate ? 'XXXXX' : ''
-    };
 }
 
 export function locationRetrieval(phoneNumber, mockCoordinates) {

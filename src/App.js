@@ -722,7 +722,7 @@ function App() {
         name: formState.name
       };
       const kycData = await api.kycMatch(kycReq);
-      logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', api.obscureKycRequest(kycReq), kycData);
+      logApiInteraction('KYC Match', 'POST', '/kyc-match/kyc-match/v0.2/match', kycReq, kycData);
 
       syncSetKycMatchResponse(kycData);
 
@@ -1008,7 +1008,7 @@ function App() {
       syncSetPatientMedicalDetails({ patientId, alert: alertMessage, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
       addMessage("Fetching patient details with KYC Fill...");
       patientKycData = await api.kycFill(phone);
-      logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, patientKycData._obscured);
+      logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, patientKycData);
       syncSetFormState(patientKycData);
       addMessage("Patient details populated.");
     }
