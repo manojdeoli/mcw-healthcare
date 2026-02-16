@@ -10,7 +10,7 @@ const HOSPITAL_LOCATION = { lat: 41.3874, lng: 2.1686 }; // West side of Barcelo
 
 const mockAdditionalPatients = [
   {
-    id: 'mock-1',
+    id: 'CIP-3847291056',
     phoneNumber: 'mock-1',
     name: 'Sarah Mitchell',
     age: 45,
@@ -31,7 +31,7 @@ const mockAdditionalPatients = [
     }
   },
   {
-    id: 'mock-2',
+    id: 'CIP-9238471029',
     phoneNumber: 'mock-2',
     name: 'James Rodriguez',
     age: 28,
@@ -52,7 +52,7 @@ const mockAdditionalPatients = [
     }
   },
   {
-    id: 'mock-3',
+    id: 'CIP-7564820394',
     phoneNumber: 'mock-3',
     name: 'Emily Chen',
     age: 52,
