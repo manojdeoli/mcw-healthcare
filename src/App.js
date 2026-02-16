@@ -285,7 +285,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.3874, lng: 2.1686 });
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.3850, lng: 2.1650 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -1035,14 +1035,14 @@ function App() {
           lng: patientLocationData.area.center.longitude
         };
         
-        // Hospital location is fixed in Barcelona (west side)
-        const fixedHospitalCoords = { lat: 41.3874, lng: 2.1686 };
+        // Hospital location is fixed South-West of real patient location (41.41146666962281, 2.203629421910704)
+        const fixedHospitalCoords = { lat: 41.3850, lng: 2.1650 };
         syncSetHospitalLocation(fixedHospitalCoords);
         
         // Broadcast hospital location to ER Dashboard
         broadcast('SET_HOSPITAL_LOCATION', fixedHospitalCoords);
 
-        // Use actual patient location from API as starting point
+        // Use actual patient location from API as starting point (coming from North-East)
         const initialUserCoords = actualPatientCoords;
 
         syncSetInitialUserLocation(initialUserCoords);

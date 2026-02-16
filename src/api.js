@@ -574,8 +574,9 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
                 ...prev,
                 medicalHistory
             }));
+            // Update vitals at step 1
+            newVitals = '♥ HR: 115 bpm | 🩸 BP: 158/108 mmHg | 🫁 O₂: 94% | 🌡 T: 37.1°C';
         } else if (i === 2) {
-            newVitals = '♥ HR: 110 bpm | 🩸 BP: 155/105 mmHg | 🫁 O₂: 95% | 🌡 T: 37.0°C';
             specialistsNeeded = ['Cardiologist', 'Emergency Physician'];
             setPatientMedicalDetails(prev => ({
                 ...prev,

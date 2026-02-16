@@ -810,3 +810,40 @@
     font-size: clamp(0.75rem, 1.1vw, 1.1rem);
   }
 }
+
+/* Optimized for 40-inch 1920x1080 display (event screen) */
+@media (min-width: 1920px) and (max-width: 1920px) {
+  .monitor-screen {
+    width: 75vw;
+    height: 70vh;
+    top: 12%;
+  }
+
+  .er-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+  }
+
+  .stat-value {
+    font-size: 1.2rem;
+  }
+
+  .patient-queue h2,
+  .patient-info h3 {
+    font-size: 1.1rem;
+  }
+
+  .detail-row,
+  .patient-complaint {
+    font-size: 0.95rem;
+  }
+
+  .map-panel h3,
+  .resource-panel h3,
+  .alert-panel h3 {
+    font-size: 1rem;
+  }
+}

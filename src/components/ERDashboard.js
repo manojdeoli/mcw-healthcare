@@ -6,7 +6,7 @@ import ambulanceIcon from '../ambulance.png';
 import patientIcon from '../patient.png';
 import emergencyRoomBg from '../emergency.png';
 
-const HOSPITAL_LOCATION = { lat: 41.3874, lng: 2.1686 }; // West side of Barcelona
+const HOSPITAL_LOCATION = { lat: 41.3850, lng: 2.1650 }; // South-West of real patient location
 
 const mockAdditionalPatients = [
   {
@@ -18,8 +18,8 @@ const mockAdditionalPatients = [
     status: 'URGENT',
     eta: '35 min',
     distance: '17.5 km',
-    location: { lat: 41.420, lng: 2.165 }, // North of hospital
-    initialLocation: { lat: 41.420, lng: 2.165 },
+    location: { lat: 41.360, lng: 2.180 }, // South-East of hospital
+    initialLocation: { lat: 41.360, lng: 2.180 },
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -40,12 +40,12 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '42 min',
     distance: '21.0 km',
-    location: { lat: 41.360, lng: 2.145 }, // South-West of hospital
-    initialLocation: { lat: 41.360, lng: 2.145 },
+    location: { lat: 41.400, lng: 2.140 }, // West of hospital
+    initialLocation: { lat: 41.400, lng: 2.140 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
-    medicalHistory: 'No significant medical history',
+    medicalHistory: 'Asthma (controlled), Previous ankle fracture (2020)',
     specialistsNeeded: ['Orthopedic Surgeon'],
     equipmentNeeded: ['X-Ray', 'Casting Materials', 'Pain Management'],
     aiSummary: {
@@ -62,8 +62,8 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '50 min',
     distance: '25.0 km',
-    location: { lat: 41.385, lng: 2.140 }, // West of hospital
-    initialLocation: { lat: 41.385, lng: 2.140 },
+    location: { lat: 41.370, lng: 2.150 }, // South of hospital
+    initialLocation: { lat: 41.370, lng: 2.150 },
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',
@@ -128,12 +128,12 @@ const ERDashboard = () => {
             let newEta, newLocation;
             if (currentEta <= 5) {
               // Reset to starting position when very close to hospital
-              newEta = Math.floor(Math.random() * 20) + 35;
+              const newEta = Math.floor(Math.random() * 20) + 35;
               // Generate random starting position around hospital
               const directions = [
-                { lat: 41.420, lng: 2.165 },  // North
-                { lat: 41.360, lng: 2.145 },  // South-West
-                { lat: 41.385, lng: 2.140 }   // West
+                { lat: 41.360, lng: 2.180 },  // South-East
+                { lat: 41.400, lng: 2.140 },  // West
+                { lat: 41.370, lng: 2.150 }   // South
               ];
               const randomDirection = directions[Math.floor(Math.random() * directions.length)];
               newLocation = randomDirection;
@@ -188,6 +188,16 @@ const ERDashboard = () => {
     };
     return () => channelRef.current?.close();
   }, []);
+
+  // Update selected patient when patients data changes
+  useEffect(() => {
+    if (selectedPatient) {
+      const updatedPatient = patients.find(p => p.phoneNumber === selectedPatient.phoneNumber);
+      if (updatedPatient) {
+        setSelectedPatient(updatedPatient);
+      }
+    }
+  }, [patients]);
 
   // Initialize map and markers
   useEffect(() => {
@@ -376,7 +386,7 @@ const ERDashboard = () => {
                                     }}
                                     style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                   >
-                                    ✓
+                                    Check-In ✓
                                   </button>
                                 )}
                               </h3>
@@ -436,7 +446,7 @@ const ERDashboard = () => {
                                       }}
                                       style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                     >
-                                      ✓
+                                      Check-In ✓
                                     </button>
                                   )}
                                 </h3>
@@ -573,29 +583,53 @@ const ERDashboard = () => {
               ×
             </button>
             
-            <h2 style={{ marginTop: 0, color: '#000', fontSize: window.innerWidth >= 1400 ? '1rem' : '0.8rem', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{selectedPatient.name}</h2>
-            <p style={{ color: '#333', marginBottom: '0.4rem', fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.6rem', fontWeight: 'bold' }}>{selectedPatient.age} years old</p>
+            <h2 style={{ marginTop: 0, color: '#000', fontSize: window.innerWidth >= 1400 ? '1rem' : '0.8rem', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{selectedPatient.name} ({selectedPatient.age})</h2>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
               <div style={{ flex: 1 }}>
-                <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', fontWeight: 'bold' }}>
-                  <div><strong>ESI Level:</strong> <span style={{ color: getESIColor(selectedPatient.esi) }}>ESI-{selectedPatient.esi}</span></div>
-                  <div><strong>Status:</strong> <span style={{ color: getStatusBadge(selectedPatient.status) }}>{selectedPatient.status}</span></div>
-                  <div><strong>ETA:</strong> {selectedPatient.eta}</div>
-                  <div><strong>Distance:</strong> {selectedPatient.distance}</div>
-                  <div><strong>Transport:</strong> {selectedPatient.transport}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                  <div>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>ESI Level:</strong>
+                    <p style={{ backgroundColor: '#ffe6e6', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getESIColor(selectedPatient.esi) }}>
+                      ESI-{selectedPatient.esi}
+                    </p>
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Status:</strong>
+                    <p style={{ backgroundColor: '#e3f2fd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getStatusBadge(selectedPatient.status) }}>
+                      {selectedPatient.status}
+                    </p>
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>ETA:</strong>
+                    <p style={{ backgroundColor: '#fff3e0', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                      {selectedPatient.eta}
+                    </p>
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Distance:</strong>
+                    <p style={{ backgroundColor: '#f3e5f5', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                      {selectedPatient.distance}
+                    </p>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Transport:</strong>
+                    <p style={{ backgroundColor: '#e8f5e9', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                      {selectedPatient.transport}
+                    </p>
+                  </div>
                 </div>
                 
                 <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
-                  <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000' }}>
+                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
+                  <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
                     {selectedPatient.complaint}
                   </p>
                 </div>
                 
                 <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
-                  <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000' }}>
+                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
+                  <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
                     {selectedPatient.vitals}
                   </p>
                 </div>
@@ -604,8 +638,8 @@ const ERDashboard = () => {
               <div style={{ flex: 1 }}>
                 {selectedPatient.medicalHistory && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
-                    <p style={{ backgroundColor: '#fff3cd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000' }}>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
+                    <p style={{ backgroundColor: '#fff3cd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
                       {selectedPatient.medicalHistory}
                     </p>
                   </div>
@@ -613,24 +647,85 @@ const ERDashboard = () => {
                 
                 {selectedPatient.specialistsNeeded && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Specialists:</strong>
-                    <p style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000', margin: '0.1rem 0' }}>{selectedPatient.specialistsNeeded.join(', ')}</p>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Specialists Required:</strong>
+                    <p style={{ backgroundColor: '#e1f5fe', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                      {selectedPatient.specialistsNeeded.join(', ')}
+                    </p>
                   </div>
                 )}
                 
                 {selectedPatient.equipmentNeeded && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Equipment:</strong>
-                    <p style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000', margin: '0.1rem 0' }}>{selectedPatient.equipmentNeeded.join(', ')}</p>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Equipments Required:</strong>
+                    <p style={{ backgroundColor: '#fce4ec', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                      {selectedPatient.equipmentNeeded.join(', ')}
+                    </p>
                   </div>
                 )}
                 
                 {selectedPatient.aiSummary && (
-                  <div style={{ backgroundColor: '#667eea', color: 'white', padding: '0.4rem', borderRadius: '4px' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', fontWeight: 'bold' }}>🤖 AI Summary</strong>
-                    <div style={{ marginTop: '0.2rem', fontSize: window.innerWidth >= 1400 ? '0.7rem' : '0.5rem', fontWeight: 'bold' }}>
-                      <div style={{ marginBottom: '0.2rem' }}><strong>Diagnosis:</strong> {selectedPatient.aiSummary.diagnosis}</div>
-                      <div><strong>Recommended Action:</strong> {selectedPatient.aiSummary.recommendedAction}</div>
+                  <div style={{ 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                    padding: '0.3rem', 
+                    borderRadius: '4px',
+                    border: '2px solid #ffd700',
+                    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                  }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.2rem',
+                      marginBottom: '0.2rem',
+                      paddingBottom: '0.15rem',
+                      borderBottom: '1px solid rgba(255, 215, 0, 0.3)'
+                    }}>
+                      <span style={{ fontSize: '0.9rem' }}>🤖</span>
+                      <strong style={{ 
+                        fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', 
+                        fontWeight: 'bold',
+                        color: '#ffd700',
+                        textShadow: '0 0 10px rgba(255, 215, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)',
+                        letterSpacing: '0.5px'
+                      }}>AI ANALYSIS</strong>
+                    </div>
+                    <div style={{ 
+                      background: 'rgba(255, 255, 255, 0.1)', 
+                      padding: '0.2rem', 
+                      borderRadius: '3px',
+                      backdropFilter: 'blur(10px)'
+                    }}>
+                      <div style={{ marginBottom: '0.2rem' }}>
+                        <strong style={{ 
+                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem',
+                          color: '#fff',
+                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                        }}>Diagnosis:</strong>
+                        <p style={{ 
+                          margin: '0.05rem 0 0 0', 
+                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', 
+                          fontWeight: 'normal', 
+                          color: '#fff',
+                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                        }}>
+                          {selectedPatient.aiSummary.diagnosis}
+                        </p>
+                      </div>
+                      <div>
+                        <strong style={{ 
+                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem',
+                          color: '#fff',
+                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                        }}>Recommended Action:</strong>
+                        <p style={{ 
+                          margin: '0.05rem 0 0 0', 
+                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', 
+                          fontWeight: 'normal', 
+                          color: '#fff',
+                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                        }}>
+                          {selectedPatient.aiSummary.recommendedAction}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
