@@ -503,7 +503,7 @@ const ERDashboard = () => {
                 <div className="er-sidebar">
                   <div className="map-panel">
                     <h3>Live Patient Tracking</h3>
-                    <div ref={mapRef} style={{ height: '250px', width: '100%', borderRadius: '4px' }}></div>
+                    <div ref={mapRef} style={{ height: window.innerWidth >= 1400 ? '300px' : '250px', width: '100%', borderRadius: '4px' }}></div>
                   </div>
 
                   <div className="resource-panel">
@@ -533,7 +533,7 @@ const ERDashboard = () => {
           </div>
         {/* Patient Detail Card Popup within Monitor */}
         {showDetailCard && selectedPatient && (
-          <div style={{
+          <div className="patient-detail-popup" style={{
             position: 'absolute',
             top: '15%',
             left: '10%',
@@ -544,7 +544,8 @@ const ERDashboard = () => {
             borderRadius: '8px',
             padding: '0.5rem',
             zIndex: 200,
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+            overflowY: 'auto'
           }}>
             <button 
               onClick={(e) => {
@@ -557,7 +558,7 @@ const ERDashboard = () => {
                 right: '15px',
                 background: 'none',
                 border: 'none',
-                fontSize: '1rem',
+                fontSize: window.innerWidth >= 1400 ? '1.2rem' : '1rem',
                 cursor: 'pointer',
                 color: '#666',
                 fontWeight: 'bold'
@@ -566,12 +567,12 @@ const ERDashboard = () => {
               ×
             </button>
             
-            <h2 style={{ marginTop: 0, color: '#000', fontSize: '0.8rem', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{selectedPatient.name}</h2>
-            <p style={{ color: '#333', marginBottom: '0.4rem', fontSize: '0.6rem', fontWeight: 'bold' }}>{selectedPatient.age} years old</p>
+            <h2 style={{ marginTop: 0, color: '#000', fontSize: window.innerWidth >= 1400 ? '1rem' : '0.8rem', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{selectedPatient.name}</h2>
+            <p style={{ color: '#333', marginBottom: '0.4rem', fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.6rem', fontWeight: 'bold' }}>{selectedPatient.age} years old</p>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem', fontSize: '0.55rem', fontWeight: 'bold' }}>
+                <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', fontWeight: 'bold' }}>
                   <div><strong>ESI Level:</strong> <span style={{ color: getESIColor(selectedPatient.esi) }}>ESI-{selectedPatient.esi}</span></div>
                   <div><strong>Status:</strong> <span style={{ color: getStatusBadge(selectedPatient.status) }}>{selectedPatient.status}</span></div>
                   <div><strong>ETA:</strong> {selectedPatient.eta}</div>
@@ -580,15 +581,15 @@ const ERDashboard = () => {
                 </div>
                 
                 <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: '0.55rem', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
-                  <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: '0.5rem', fontWeight: 'bold', color: '#000' }}>
+                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
+                  <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000' }}>
                     {selectedPatient.complaint}
                   </p>
                 </div>
                 
                 <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: '0.55rem', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
-                  <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: '0.5rem', fontWeight: 'bold', color: '#000' }}>
+                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
+                  <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000' }}>
                     {selectedPatient.vitals}
                   </p>
                 </div>
@@ -597,8 +598,8 @@ const ERDashboard = () => {
               <div style={{ flex: 1 }}>
                 {selectedPatient.medicalHistory && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: '0.55rem', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
-                    <p style={{ backgroundColor: '#fff3cd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: '0.5rem', fontWeight: 'bold', color: '#000' }}>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
+                    <p style={{ backgroundColor: '#fff3cd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000' }}>
                       {selectedPatient.medicalHistory}
                     </p>
                   </div>
@@ -606,22 +607,22 @@ const ERDashboard = () => {
                 
                 {selectedPatient.specialistsNeeded && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: '0.55rem', color: '#000', fontWeight: 'bold' }}>Specialists:</strong>
-                    <p style={{ fontSize: '0.5rem', fontWeight: 'bold', color: '#000', margin: '0.1rem 0' }}>{selectedPatient.specialistsNeeded.join(', ')}</p>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Specialists:</strong>
+                    <p style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000', margin: '0.1rem 0' }}>{selectedPatient.specialistsNeeded.join(', ')}</p>
                   </div>
                 )}
                 
                 {selectedPatient.equipmentNeeded && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: '0.55rem', color: '#000', fontWeight: 'bold' }}>Equipment:</strong>
-                    <p style={{ fontSize: '0.5rem', fontWeight: 'bold', color: '#000', margin: '0.1rem 0' }}>{selectedPatient.equipmentNeeded.join(', ')}</p>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Equipment:</strong>
+                    <p style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'bold', color: '#000', margin: '0.1rem 0' }}>{selectedPatient.equipmentNeeded.join(', ')}</p>
                   </div>
                 )}
                 
                 {selectedPatient.aiSummary && (
                   <div style={{ backgroundColor: '#667eea', color: 'white', padding: '0.4rem', borderRadius: '4px' }}>
-                    <strong style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>🤖 AI Summary</strong>
-                    <div style={{ marginTop: '0.2rem', fontSize: '0.5rem', fontWeight: 'bold' }}>
+                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.8rem' : '0.55rem', fontWeight: 'bold' }}>🤖 AI Summary</strong>
+                    <div style={{ marginTop: '0.2rem', fontSize: window.innerWidth >= 1400 ? '0.7rem' : '0.5rem', fontWeight: 'bold' }}>
                       <div style={{ marginBottom: '0.2rem' }}><strong>Diagnosis:</strong> {selectedPatient.aiSummary.diagnosis}</div>
                       <div><strong>Recommended Action:</strong> {selectedPatient.aiSummary.recommendedAction}</div>
                     </div>

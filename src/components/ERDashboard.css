@@ -67,7 +67,7 @@
     0 0 30px rgba(0, 150, 255, 0.2),
     0 0 60px rgba(0, 150, 255, 0.1),
     inset 0 0 50px rgba(0, 150, 255, 0.05);
-  border: 2px solid #333;
+  border: 5px solid #333;
   transition: all 0.3s ease;
   z-index: 10;
   filter: drop-shadow(0 0 20px rgba(0, 150, 255, 0.3));
@@ -683,12 +683,13 @@
 /* Responsive scaling for large screens (40-inch 1080p displays) */
 @media (min-width: 1400px) {
   .monitor-screen {
-    width: 85vw;
-    height: 75vh;
-    top: 10%;
+    width: 70vw;
+    height: 65vh;
+    top: 15%;
     left: 50%;
     right: auto;
     transform: translateX(-50%) perspective(1000px) rotateX(-12deg);
+    border: 5px solid #333;
   }
 
   .monitor-screen::before {
@@ -699,93 +700,111 @@
     right: 20%;
   }
 
-  /* Scale header elements */
+  .monitor-content {
+    transform: scale(1);
+  }
+
+  /* Scale header elements - reduced sizes */
   .er-header h1 {
-    font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+    font-size: clamp(0.9rem, 1.5vw, 1.5rem);
   }
 
   .stat-label {
-    font-size: clamp(0.8rem, 1.2vw, 1.2rem);
+    font-size: clamp(0.55rem, 0.8vw, 0.8rem);
   }
 
   .stat-value {
-    font-size: clamp(1.2rem, 1.8vw, 1.8rem);
+    font-size: clamp(0.8rem, 1.1vw, 1.1rem);
   }
 
-  /* Scale patient queue */
+  /* Scale patient queue - reduced sizes */
   .patient-queue h2 {
-    font-size: clamp(1.2rem, 1.8vw, 1.8rem);
+    font-size: clamp(0.7rem, 1vw, 1rem);
   }
 
   .patient-info h3 {
-    font-size: clamp(1.2rem, 2vw, 2rem);
+    font-size: clamp(0.7rem, 1vw, 1rem);
   }
 
   .patient-age {
-    font-size: clamp(1rem, 1.5vw, 1.5rem);
+    font-size: clamp(0.65rem, 0.9vw, 0.9rem);
   }
 
   .status-badge {
-    font-size: clamp(0.9rem, 1.3vw, 1.3rem);
-    padding: 0.3rem 0.6rem;
+    font-size: clamp(0.6rem, 0.85vw, 0.85rem);
+    padding: 0.15rem 0.35rem;
   }
 
   .detail-row {
-    font-size: clamp(1rem, 1.5vw, 1.5rem);
+    font-size: clamp(0.65rem, 0.9vw, 0.9rem);
   }
 
   .patient-complaint {
-    font-size: clamp(1rem, 1.5vw, 1.5rem);
-    padding: 0.6rem;
+    font-size: clamp(0.65rem, 0.9vw, 0.9rem);
+    padding: 0.3rem;
   }
 
-  /* Scale map and resource panels */
+  /* Scale map and resource panels - reduced sizes */
   .map-panel h3,
   .resource-panel h3,
   .alert-panel h3 {
-    font-size: clamp(1rem, 1.5vw, 1.5rem);
+    font-size: clamp(0.65rem, 0.9vw, 0.9rem);
   }
 
-  .map-panel .leaflet-container,
-  .map-panel > div > div {
-    height: clamp(300px, 35vh, 450px) !important;
+  /* Moderate map height for better balance */
+  .map-panel > div {
+    height: 300px !important;
   }
 
   .resource-item {
-    font-size: clamp(0.9rem, 1.3vw, 1.3rem);
-    padding: 0.5rem;
+    font-size: clamp(0.6rem, 0.85vw, 0.85rem);
+    padding: 0.25rem;
   }
 
   .resource-value {
-    font-size: clamp(1rem, 1.5vw, 1.5rem);
+    font-size: clamp(0.65rem, 0.9vw, 0.9rem);
   }
 
-  /* Scale alert panel */
+  /* Scale alert panel - reduced sizes */
   .alert-item strong {
-    font-size: clamp(0.9rem, 1.3vw, 1.3rem);
+    font-size: clamp(0.6rem, 0.85vw, 0.85rem);
   }
 
   .alert-item p {
-    font-size: clamp(0.85rem, 1.2vw, 1.2rem);
+    font-size: clamp(0.55rem, 0.8vw, 0.8rem);
   }
 
-  /* Scale patient cards */
+  /* Scale patient cards - reduced padding */
   .patient-card {
-    padding: 0.5rem;
-    margin-bottom: 0.4rem;
+    padding: 0.25rem;
+    margin-bottom: 0.2rem;
   }
 
   .patient-details {
-    gap: 0.5rem;
-    padding: 0.5rem;
+    gap: 0.25rem;
+    padding: 0.25rem;
   }
 
-  /* Scale detail card popup */
+  /* Ensure sidebar content is visible */
+  .er-sidebar {
+    overflow-y: auto;
+    max-height: 100%;
+  }
+
+  /* Scale detail card popup - smaller font sizes */
   .patient-detail-popup h2 {
-    font-size: clamp(1.5rem, 2vw, 2rem);
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
   }
 
   .patient-detail-popup p {
-    font-size: clamp(1rem, 1.5vw, 1.5rem);
+    font-size: clamp(0.75rem, 1.2vw, 1.2rem);
+  }
+
+  .patient-detail-popup strong {
+    font-size: clamp(0.8rem, 1.2vw, 1.2rem);
+  }
+
+  .patient-detail-popup .detail-grid {
+    font-size: clamp(0.75rem, 1.1vw, 1.1rem);
   }
 }
