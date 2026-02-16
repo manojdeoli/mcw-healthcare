@@ -679,3 +679,113 @@
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(40, 167, 69, 0.4);
 }
+
+/* Responsive scaling for large screens (40-inch 1080p displays) */
+@media (min-width: 1400px) {
+  .monitor-screen {
+    width: 85vw;
+    height: 75vh;
+    top: 10%;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%) perspective(1000px) rotateX(-12deg);
+  }
+
+  .monitor-screen::before {
+    left: 20%;
+  }
+
+  .monitor-screen::after {
+    right: 20%;
+  }
+
+  /* Scale header elements */
+  .er-header h1 {
+    font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+  }
+
+  .stat-label {
+    font-size: clamp(0.8rem, 1.2vw, 1.2rem);
+  }
+
+  .stat-value {
+    font-size: clamp(1.2rem, 1.8vw, 1.8rem);
+  }
+
+  /* Scale patient queue */
+  .patient-queue h2 {
+    font-size: clamp(1.2rem, 1.8vw, 1.8rem);
+  }
+
+  .patient-info h3 {
+    font-size: clamp(1.2rem, 2vw, 2rem);
+  }
+
+  .patient-age {
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
+  }
+
+  .status-badge {
+    font-size: clamp(0.9rem, 1.3vw, 1.3rem);
+    padding: 0.3rem 0.6rem;
+  }
+
+  .detail-row {
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
+  }
+
+  .patient-complaint {
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
+    padding: 0.6rem;
+  }
+
+  /* Scale map and resource panels */
+  .map-panel h3,
+  .resource-panel h3,
+  .alert-panel h3 {
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
+  }
+
+  .map-panel .leaflet-container,
+  .map-panel > div > div {
+    height: clamp(300px, 35vh, 450px) !important;
+  }
+
+  .resource-item {
+    font-size: clamp(0.9rem, 1.3vw, 1.3rem);
+    padding: 0.5rem;
+  }
+
+  .resource-value {
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
+  }
+
+  /* Scale alert panel */
+  .alert-item strong {
+    font-size: clamp(0.9rem, 1.3vw, 1.3rem);
+  }
+
+  .alert-item p {
+    font-size: clamp(0.85rem, 1.2vw, 1.2rem);
+  }
+
+  /* Scale patient cards */
+  .patient-card {
+    padding: 0.5rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .patient-details {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  /* Scale detail card popup */
+  .patient-detail-popup h2 {
+    font-size: clamp(1.5rem, 2vw, 2rem);
+  }
+
+  .patient-detail-popup p {
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
+  }
+}
