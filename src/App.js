@@ -103,9 +103,9 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
       if (mapRef.current._leaflet_id) mapRef.current._leaflet_id = null;
-      // Use hospitalLocation if available, otherwise default to Budapest
-      const initialLat = hospitalLocation?.lat || 47.48627616952785;
-      const initialLng = hospitalLocation?.lng || 19.07915612501993;
+      // Use hospitalLocation if available, otherwise default to Barcelona
+      const initialLat = hospitalLocation?.lat || 41.41146666962281;
+      const initialLng = hospitalLocation?.lng || 2.203629421910704;
       const map = L.map(mapRef.current).setView([initialLat, initialLng], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -285,7 +285,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.3987, lng: 2.1767 });
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.41146666962281, lng: 2.203629421910704 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -1025,30 +1025,31 @@ function App() {
       syncSetSimulationMode(mode);
       if (mode === 'arrival') {
         setIsLoading(true);
-        // Fetch actual hotel location
-        const hospitalLocationData = await api.locationRetrieval(phone);
-        logApiInteraction('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', { device: { phoneNumber: phone } }, hospitalLocationData);
+        // Fetch actual patient location from API
+        const patientLocationData = await api.locationRetrieval(phone);
+        logApiInteraction('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', { device: { phoneNumber: phone } }, patientLocationData);
 
-        const actualHotelCoords = {
-          lat: hospitalLocationData.area.center.latitude,
-          lng: hospitalLocationData.area.center.longitude
+        const actualPatientCoords = {
+          lat: patientLocationData.area.center.latitude,
+          lng: patientLocationData.area.center.longitude
         };
-        syncSetHospitalLocation(actualHotelCoords);
+        
+        // Hospital location is fixed in Barcelona
+        const fixedHospitalCoords = { lat: 41.41146666962281, lng: 2.203629421910704 };
+        syncSetHospitalLocation(fixedHospitalCoords);
         
         // Broadcast hospital location to ER Dashboard
-        broadcast('SET_HOSPITAL_LOCATION', actualHotelCoords);
+        broadcast('SET_HOSPITAL_LOCATION', fixedHospitalCoords);
 
-        // Set initial user location for good demo visibility (3-4 km away from Budapest hospital)
-        const userStartLat = actualHotelCoords.lat + 0.03; // 0.03 degrees ~ 3.3 km
-        const userStartLng = actualHotelCoords.lng + 0.03;
-        const initialUserCoords = { lat: userStartLat, lng: userStartLng };
+        // Use actual patient location from API as starting point
+        const initialUserCoords = actualPatientCoords;
 
         syncSetInitialUserLocation(initialUserCoords);
         syncSetUserGps(initialUserCoords);
         setIsLoading(false);
 
         // Calculate distance
-        const distance = getDistance(initialUserCoords, actualHotelCoords);
+        const distance = getDistance(initialUserCoords, fixedHospitalCoords);
         const distanceKm = (distance / 1000).toFixed(1);
         
         // Determine ESI level based on symptoms
@@ -1084,7 +1085,7 @@ function App() {
         const subId = await api.startMedicalTransportSequence(
           phone,
           initialUserCoords,
-          actualHotelCoords,
+          fixedHospitalCoords,
           addMessage,
           syncSetLocation,
           syncSetUserGps,

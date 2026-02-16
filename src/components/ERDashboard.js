@@ -6,7 +6,7 @@ import ambulanceIcon from '../ambulance.png';
 import patientIcon from '../patient.png';
 import emergencyRoomBg from '../emergency.png';
 
-const HOSPITAL_LOCATION = { lat: 41.3987, lng: 2.1767 };
+const HOSPITAL_LOCATION = { lat: 41.41146666962281, lng: 2.203629421910704 };
 
 const mockAdditionalPatients = [
   {
@@ -18,7 +18,7 @@ const mockAdditionalPatients = [
     status: 'URGENT',
     eta: '35 min',
     distance: '17.5 km',
-    location: { lat: 41.420, lng: 2.179 },
+    location: { lat: 41.420, lng: 2.210 },
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -39,7 +39,7 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '42 min',
     distance: '21.0 km',
-    location: { lat: 41.386, lng: 2.140 },
+    location: { lat: 41.386, lng: 2.195 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -60,7 +60,7 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '50 min',
     distance: '25.0 km',
-    location: { lat: 41.350, lng: 2.179 },
+    location: { lat: 41.400, lng: 2.220 },
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',

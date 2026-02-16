@@ -374,18 +374,18 @@ export function locationRetrieval(phoneNumber, mockCoordinates) {
 }
 
 export function locationVerification(data, mockResult = "TRUE") {
-    // Use mock implementation like hotel project for consistent demo experience
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const response = {
-                verificationResult: mockResult
-            };
-            resolve(response);
-        }, 500);
-    });
+    // Real API call
+    return post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data);
     
-    // Real API call (commented out for demo consistency)
-    // return post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data);
+    // Mock implementation (commented out)
+    // return new Promise(resolve => {
+    //     setTimeout(() => {
+    //         const response = {
+    //             verificationResult: mockResult
+    //         };
+    //         resolve(response);
+    //     }, 500);
+    // });
 }
 
 export function createGeofencingSubscription(phoneNumber, latitude, longitude, radius) {
@@ -635,7 +635,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         area: {
             areaType: "CIRCLE",
             center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng },
-            radius: 100
+            radius: 200  // Increased radius to 200m for better verification success
         }
     };
 
