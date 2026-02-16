@@ -6,5 +6,7 @@ export const formFields = [
 ];
 
 export const generatePatientId = () => {
-    return Math.floor(100000000 + Math.random() * 900000000).toString();
+    // Generate CIP-SNS format (Spain National Health System Personal Identification Code)
+    // Format: 10-digit number
+    return 'CIP-' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
 };

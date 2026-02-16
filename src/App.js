@@ -1003,7 +1003,7 @@ function App() {
 
     let patientKycData = null;
     if (mode === 'arrival') {
-      const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
+      const patientId = generatePatientId();
       const alertMessage = `INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness`;
       syncSetPatientMedicalDetails({ patientId, alert: alertMessage, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
       addMessage("Fetching patient details with KYC Fill...");
@@ -1062,7 +1062,7 @@ function App() {
         
         // Broadcast complete patient data to ER Dashboard (without ETA initially)
         const patientData = {
-          id: Date.now(),
+          id: patientId, // Use CIP-SNS format ID
           phoneNumber: phone,
           name: patientInfo.name || 'Unknown Patient',
           age: age,

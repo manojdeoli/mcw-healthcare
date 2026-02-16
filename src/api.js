@@ -495,13 +495,11 @@ export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage,
 }
 
 export async function startMedicalTransportSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, logApi, broadcast, patientData) {
-    const patientId = Math.floor(100000000 + Math.random() * 900000000).toString();
-    
     addMessage("Starting Medical Transport sequence...");
 
     await new Promise(resolve => setTimeout(resolve, 2000));
     setPatientMedicalDetails({
-        patientId: patientId,
+        patientId: patientData.id, // Use the CIP-SNS ID from patientData
         alert: 'INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness',
         esi: 'Level 2 (Emergency)',
         vitals: '♥ HR: 120 bpm | 🩸 BP: 160/110 mmHg | 🫁 O₂: 93% | 🌡 T: 37.2°C',

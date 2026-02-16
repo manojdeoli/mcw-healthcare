@@ -358,7 +358,7 @@ const ERDashboard = () => {
                           <div className="patient-header">
                             <div className="patient-info">
                               <h3>
-                                {sortedPatients[currentPatientIndex].name} ({sortedPatients[currentPatientIndex].age})
+                                {sortedPatients[currentPatientIndex].name} ({sortedPatients[currentPatientIndex].age}) {sortedPatients[currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[currentPatientIndex].id}</span>}
                                 {/* Check-in button only when patient arrives at hospital */}
                                 {!sortedPatients[currentPatientIndex].phoneNumber.startsWith('mock-') && 
                                  sortedPatients[currentPatientIndex].status === 'ARRIVED' && (
@@ -417,7 +417,7 @@ const ERDashboard = () => {
                             <div className="patient-header">
                               <div className="patient-info">
                                 <h3>
-                                  {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].name} ({sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].age})
+                                  {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].name} ({sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].age}) {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id}</span>}
                                   {/* Check-in button only when patient arrives at hospital */}
                                   {!sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].phoneNumber.startsWith('mock-') && 
                                    sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status === 'ARRIVED' && (
