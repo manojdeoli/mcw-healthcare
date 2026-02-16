@@ -19,6 +19,7 @@ const mockAdditionalPatients = [
     eta: '35 min',
     distance: '17.5 km',
     location: { lat: 41.420, lng: 2.165 }, // North of hospital
+    initialLocation: { lat: 41.420, lng: 2.165 },
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -40,6 +41,7 @@ const mockAdditionalPatients = [
     eta: '42 min',
     distance: '21.0 km',
     location: { lat: 41.350, lng: 2.170 }, // South of hospital
+    initialLocation: { lat: 41.350, lng: 2.170 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -61,6 +63,7 @@ const mockAdditionalPatients = [
     eta: '50 min',
     distance: '25.0 km',
     location: { lat: 41.385, lng: 2.140 }, // West of hospital
+    initialLocation: { lat: 41.385, lng: 2.140 },
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',
@@ -123,19 +126,20 @@ const ERDashboard = () => {
           const currentEta = parseInt(patient.eta);
           if (!isNaN(currentEta)) {
             let newEta, newLocation;
-            if (currentEta <= 10) {
-              // Reset to starting position
+            if (currentEta <= 5) {
+              // Reset to starting position when very close to hospital
               newEta = Math.floor(Math.random() * 20) + 35;
-              const angle = Math.random() * 2 * Math.PI;
-              const distance = 0.05 + Math.random() * 0.03;
-              newLocation = {
-                lat: HOSPITAL_LOCATION.lat + Math.cos(angle) * distance,
-                lng: HOSPITAL_LOCATION.lng + Math.sin(angle) * distance
-              };
+              // Generate random starting position around hospital
+              const directions = [
+                { lat: 41.420, lng: 2.165 },  // North
+                { lat: 41.350, lng: 2.170 },  // South
+                { lat: 41.385, lng: 2.140 }   // West
+              ];
+              const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+              newLocation = randomDirection;
             } else {
               // Move closer to hospital
               newEta = currentEta - 1;
-              const progress = (55 - newEta) / 45; // Progress from 0 to 1
               const currentLat = patient.location.lat;
               const currentLng = patient.location.lng;
               newLocation = {
