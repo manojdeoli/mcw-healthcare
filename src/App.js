@@ -1002,8 +1002,9 @@ function App() {
     }
 
     let patientKycData = null;
+    let patientId = null;
     if (mode === 'arrival') {
-      const patientId = generatePatientId();
+      patientId = generatePatientId();
       const alertMessage = `INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness`;
       syncSetPatientMedicalDetails({ patientId, alert: alertMessage, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
       addMessage("Fetching patient details with KYC Fill...");
