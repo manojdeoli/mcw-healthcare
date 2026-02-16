@@ -40,8 +40,8 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '42 min',
     distance: '21.0 km',
-    location: { lat: 41.350, lng: 2.170 }, // South of hospital
-    initialLocation: { lat: 41.350, lng: 2.170 },
+    location: { lat: 41.360, lng: 2.145 }, // South-West of hospital
+    initialLocation: { lat: 41.360, lng: 2.145 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -132,7 +132,7 @@ const ERDashboard = () => {
               // Generate random starting position around hospital
               const directions = [
                 { lat: 41.420, lng: 2.165 },  // North
-                { lat: 41.350, lng: 2.170 },  // South
+                { lat: 41.360, lng: 2.145 },  // South-West
                 { lat: 41.385, lng: 2.140 }   // West
               ];
               const randomDirection = directions[Math.floor(Math.random() * directions.length)];
