@@ -18,7 +18,7 @@ const mockAdditionalPatients = [
     status: 'URGENT',
     eta: '35 min',
     distance: '17.5 km',
-    location: { lat: 41.420, lng: 2.210 }, // Northeast of hospital
+    location: { lat: 41.420, lng: 2.165 }, // North of hospital
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -39,7 +39,7 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '42 min',
     distance: '21.0 km',
-    location: { lat: 41.410, lng: 2.195 }, // Northeast of hospital
+    location: { lat: 41.350, lng: 2.170 }, // South of hospital
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -60,7 +60,7 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '50 min',
     distance: '25.0 km',
-    location: { lat: 41.405, lng: 2.185 }, // Northeast of hospital
+    location: { lat: 41.385, lng: 2.140 }, // West of hospital
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',
