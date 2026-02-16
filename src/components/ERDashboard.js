@@ -361,8 +361,9 @@ const ERDashboard = () => {
                         >
                           <div className="patient-header">
                             <div className="patient-info">
-                              <h3>
-                                {sortedPatients[currentPatientIndex].name} ({sortedPatients[currentPatientIndex].age}) {sortedPatients[currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[currentPatientIndex].id}</span>}
+                              <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
+                                <span>{sortedPatients[currentPatientIndex].name} ({sortedPatients[currentPatientIndex].age})</span>
+                                {sortedPatients[currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[currentPatientIndex].id}</span>}
                                 {/* Check-in button only when patient arrives at hospital */}
                                 {!sortedPatients[currentPatientIndex].phoneNumber.startsWith('mock-') && 
                                  sortedPatients[currentPatientIndex].status === 'ARRIVED' && (
@@ -373,9 +374,9 @@ const ERDashboard = () => {
                                       console.log('Check-in clicked for:', sortedPatients[currentPatientIndex].name);
                                       handleCheckIn(sortedPatients[currentPatientIndex]);
                                     }}
-                                    style={{ marginLeft: '5px', fontSize: '0.45rem', padding: '1px 3px', borderRadius: '2px', border: '1px solid #007bff', background: '#007bff', color: 'white', lineHeight: '1' }}
+                                    style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                   >
-                                    Check-In
+                                    ✓
                                   </button>
                                 )}
                               </h3>
@@ -420,8 +421,9 @@ const ERDashboard = () => {
                           >
                             <div className="patient-header">
                               <div className="patient-info">
-                                <h3>
-                                  {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].name} ({sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].age}) {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id}</span>}
+                                <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
+                                  <span>{sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].name} ({sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].age})</span>
+                                  {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id}</span>}
                                   {/* Check-in button only when patient arrives at hospital */}
                                   {!sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].phoneNumber.startsWith('mock-') && 
                                    sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status === 'ARRIVED' && (
@@ -432,9 +434,9 @@ const ERDashboard = () => {
                                         console.log('Check-in clicked for:', sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].name);
                                         handleCheckIn(sortedPatients[(currentPatientIndex + 1) % sortedPatients.length]);
                                       }}
-                                      style={{ marginLeft: '5px', fontSize: '0.45rem', padding: '1px 3px', borderRadius: '2px', border: '1px solid #007bff', background: '#007bff', color: 'white', lineHeight: '1' }}
+                                      style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                     >
-                                      Check-In
+                                      ✓
                                     </button>
                                   )}
                                 </h3>

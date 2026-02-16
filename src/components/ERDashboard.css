@@ -662,16 +662,18 @@
   background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
   color: white;
   border: none;
-  padding: 0.1rem 0.2rem;
-  border-radius: 3px;
-  font-size: 0.3rem;
+  padding: 0.05rem 0.15rem;
+  border-radius: 2px;
+  font-size: 0.5em;
   font-weight: bold;
   cursor: pointer;
-  margin-top: 0.1rem;
-  width: 100%;
+  margin-top: 0;
+  width: auto;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(40, 167, 69, 0.3);
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .checkin-button:hover {
