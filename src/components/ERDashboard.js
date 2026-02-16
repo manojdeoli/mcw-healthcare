@@ -216,15 +216,32 @@ const ERDashboard = () => {
 
       // Add patient/ambulance markers
       patients.forEach(patient => {
-        if (patient.location && patient.status !== 'CHECKED_IN' && patient.status !== 'LEFT_AMA') {
-          const ambulanceMarker = L.divIcon({
-            html: '<div style="background: white; border: 2px solid #dc3545; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(220, 53, 69, 0.8);">🚑</div>',
-            className: 'ambulance-marker',
-            iconSize: [30, 30]
-          });
-          L.marker([patient.location.lat, patient.location.lng], { icon: ambulanceMarker })
-            .addTo(mapInstanceRef.current)
-            .bindPopup(`${patient.name}<br/>ESI-${patient.esi}<br/>ETA: ${patient.eta}<br/>${patient.transport}`);
+        if (patient.location) {
+          // Show ambulance icon for incoming patients, patient icon for checked-in/leaving patients
+          const isLeaving = patient.status === 'LEFT_AMA';
+          const isCheckedIn = patient.status === 'CHECKED_IN';
+          
+          if (!isCheckedIn && !isLeaving) {
+            // Incoming ambulance
+            const ambulanceMarker = L.divIcon({
+              html: '<div style="background: white; border: 2px solid #dc3545; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(220, 53, 69, 0.8);">🚑</div>',
+              className: 'ambulance-marker',
+              iconSize: [30, 30]
+            });
+            L.marker([patient.location.lat, patient.location.lng], { icon: ambulanceMarker })
+              .addTo(mapInstanceRef.current)
+              .bindPopup(`${patient.name}<br/>ESI-${patient.esi}<br/>ETA: ${patient.eta}<br/>${patient.transport}`);
+          } else if (isLeaving) {
+            // Patient leaving (show patient icon)
+            const patientMarker = L.divIcon({
+              html: '<div style="background: white; border: 2px solid #FF6B35; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(255, 107, 53, 0.8);">🚶</div>',
+              className: 'patient-marker',
+              iconSize: [30, 30]
+            });
+            L.marker([patient.location.lat, patient.location.lng], { icon: patientMarker })
+              .addTo(mapInstanceRef.current)
+              .bindPopup(`${patient.name}<br/>LEFT AMA<br/>Contact: ${patient.phoneNumber}`);
+          }
         }
       });
 
