@@ -497,7 +497,7 @@ export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage,
 export async function startMedicalTransportSequence(phoneNumber, initialUserLocation, hospitalLocation, addMessage, setLocation, setUserGps, setPatientStatus, setPatientMedicalDetails, generateRoute, setArtificialTime, logApi, broadcast, patientData) {
     addMessage("Starting Medical Transport sequence...");
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     setPatientMedicalDetails({
         patientId: patientData.id, // Use the CIP-SNS ID from patientData
         alert: 'INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness',
@@ -509,7 +509,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         treatmentNeeds: { specialists: [], equipment: [] },
     });
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     addMessage("Patient transport initiated.");
 
     const d = new Date();
@@ -517,13 +517,13 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
 
     const route = generateRoute(initialUserLocation, hospitalLocation, 6);
     const timeSteps = [
-        { time: `${datePrefix}T14:30:00`, delay: 3000 }, // 30 mins
-        { time: `${datePrefix}T14:35:00`, delay: 3000 }, // 25 mins
-        { time: `${datePrefix}T14:40:00`, delay: 3000 }, // 20 mins
-        { time: `${datePrefix}T14:45:00`, delay: 3000 }, // 15 mins
-        { time: `${datePrefix}T14:50:00`, delay: 3000 }, // 10 mins
-        { time: `${datePrefix}T14:55:00`, delay: 3000 }, // 5 mins
-        { time: `${datePrefix}T15:00:00`, delay: 3000 }, // 0 mins
+        { time: `${datePrefix}T14:30:00`, delay: 2000 }, // 30 mins
+        { time: `${datePrefix}T14:35:00`, delay: 2000 }, // 25 mins
+        { time: `${datePrefix}T14:40:00`, delay: 2000 }, // 20 mins
+        { time: `${datePrefix}T14:45:00`, delay: 2000 }, // 15 mins
+        { time: `${datePrefix}T14:50:00`, delay: 2000 }, // 10 mins
+        { time: `${datePrefix}T14:55:00`, delay: 2000 }, // 5 mins
+        { time: `${datePrefix}T15:00:00`, delay: 2000 }, // 0 mins
     ];
 
     for (let i = 0; i < route.length; i++) {
