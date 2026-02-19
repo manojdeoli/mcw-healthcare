@@ -212,7 +212,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
 
       if (currentLiveUserGps && verifiedPhoneNumber) {
         console.log('Admin Console Map rendering ambulance at:', currentLiveUserGps);
-        const iconUrl = simulationMode === 'departure' ? patientIconPng : ambulanceIconPng;
+        // Use patient icon for departure and outpatient monitoring, ambulance for arrival
+        const iconUrl = (simulationMode === 'departure' || simulationMode === 'outpatient') ? patientIconPng : ambulanceIconPng;
         const userIcon = L.icon({
           iconUrl: iconUrl,
           iconSize: [32, 32],
@@ -285,7 +286,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.3850, lng: 2.1650 });
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.400, lng: 2.100 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -701,6 +702,13 @@ function App() {
       alert('Please verify your phone number first to start registration.');
       return;
     }
+    
+    addMessage("Fetching patient details with KYC Fill...");
+    const patientKycData = await api.kycFill(phone);
+    logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, patientKycData);
+    syncSetFormState(patientKycData);
+    addMessage("Patient details populated.");
+    
     syncSetRegistrationStatus('Registered');
     addMessage("Registration Status: Registered");
   };
@@ -759,6 +767,7 @@ function App() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (isSequenceRunning && verifiedPhoneNumber) {
@@ -896,7 +905,7 @@ function App() {
       return;
     }
 
-    setIsLoading(true);
+    setIsVerifying(true);
     try {
       const verificationData = await api.verifyPhoneNumber(fullPhoneNumber);
       logApiInteraction('Number Verification', 'POST', '/number-verification/number-verification/v0/verify', { phoneNumber: fullPhoneNumber }, verificationData);
@@ -917,7 +926,7 @@ function App() {
       console.error('Phone verification failed:', err);
       setError('Phone verification failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsVerifying(false);
     }
   };
 
@@ -1007,11 +1016,6 @@ function App() {
       patientId = generatePatientId();
       const alertMessage = `INCOMING PATIENT - High-level symptoms: Chest pains and intermittent consciousness`;
       syncSetPatientMedicalDetails({ patientId, alert: alertMessage, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
-      addMessage("Fetching patient details with KYC Fill...");
-      patientKycData = await api.kycFill(phone);
-      logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, patientKycData);
-      syncSetFormState(patientKycData);
-      addMessage("Patient details populated.");
     }
 
     setIsSequenceRunning(true);
@@ -1035,12 +1039,9 @@ function App() {
           lng: patientLocationData.area.center.longitude
         };
         
-        // Hospital location is fixed South-West of real patient location (41.41146666962281, 2.203629421910704)
-        const fixedHospitalCoords = { lat: 41.3850, lng: 2.1650 };
+        // Hospital location is fixed in Barcelona - Hospital Clínic area
+        const fixedHospitalCoords = { lat: 41.400, lng: 2.100 };
         syncSetHospitalLocation(fixedHospitalCoords);
-        
-        // Broadcast hospital location to ER Dashboard
-        broadcast('SET_HOSPITAL_LOCATION', fixedHospitalCoords);
 
         // Use actual patient location from API as starting point (coming from North-East)
         const initialUserCoords = actualPatientCoords;
@@ -1146,6 +1147,7 @@ function App() {
     syncSetArtificialTime(new Date());
     setIsSequenceRunning(true);
     syncSetOutpatientStatus("Initializing...");
+    syncSetSimulationMode('outpatient');
     
     try {
         let startLoc = initialUserLocation;
@@ -1451,7 +1453,7 @@ function App() {
               
               if (s.userGps && s.hospitalLocation) {
                 let iconUrl = s.ambulanceIcon;
-                if (s.simulationMode === 'departure' && s.patientIcon) {
+                if ((s.simulationMode === 'departure' || s.simulationMode === 'outpatient') && s.patientIcon) {
                   iconUrl = s.patientIcon;
                 }
                 
@@ -1572,7 +1574,7 @@ function App() {
                   <div className="api-buttons">
                     <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
                     {patientStatus !== 'Checked In' && patientStatus !== 'Awaiting Check-in' && (
-                      <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Admit Patient & Monitor Transport</button>
+                      <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Monitor Transport & Admit Patient</button>
                     )}
                     {patientStatus === 'Awaiting Check-in' && (
                       <button className="btn btn-success" onClick={handleCompleteCheckIn}>Complete Check-in</button>
@@ -1728,7 +1730,7 @@ function App() {
                         <div className="form-group">
                           <input type="text" id="phone" className="form-control" placeholder="e.g., +61412345678" value={phone} onChange={handlePhoneChange} />
                         </div>
-                        <button type="submit" id="verifyBtn" className="btn btn-primary">Verify</button>
+                        <button type="submit" id="verifyBtn" className="btn btn-primary" disabled={isVerifying}>{isVerifying ? 'Verifying...' : 'Verify'}</button>
                       </div>
                       {error && <div id="error" className="alert alert-danger">{error}</div>}
                       {success && <div id="success" className="alert alert-success">{success}</div>}
@@ -1829,7 +1831,7 @@ function App() {
                     <div className="api-buttons">
                       <button className="btn btn-primary" onClick={handleRegistrationSequence}>Start Registration</button>
                       {patientStatus !== 'Checked In' && patientStatus !== 'Awaiting Check-in' && (
-                        <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Admit Patient & Monitor Transport</button>
+                        <button className="btn btn-primary" onClick={() => handlePatientSequence('arrival')}>Monitor Transport & Admit Patient</button>
                       )}
                       {patientStatus === 'Awaiting Check-in' && (
                         <button className="btn btn-success" onClick={handleCompleteCheckIn}>Complete Check-in</button>
