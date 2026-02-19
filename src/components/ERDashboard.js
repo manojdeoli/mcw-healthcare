@@ -6,7 +6,8 @@ import ambulanceIcon from '../ambulance.png';
 import patientIcon from '../patient.png';
 import emergencyRoomBg from '../emergency.png';
 
-const HOSPITAL_LOCATION = { lat: 41.3850, lng: 2.1650 }; // South-West of real patient location
+const HOSPITAL_LOCATION = { lat: 41.400, lng: 2.100 }; // Barcelona - Hospital Clínic area
+const MAP_CENTER = { lat: 41.3850, lng: 2.050 }; // Shifted west to show incoming ambulances
 
 const mockAdditionalPatients = [
   {
@@ -18,8 +19,8 @@ const mockAdditionalPatients = [
     status: 'URGENT',
     eta: '55 min',
     distance: '27.5 km',
-    location: { lat: 41.550, lng: 2.350 },
-    initialLocation: { lat: 41.550, lng: 2.350 },
+    location: { lat: 41.520, lng: 1.950 },
+    initialLocation: { lat: 41.520, lng: 1.950 },
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -40,8 +41,8 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '62 min',
     distance: '31.0 km',
-    location: { lat: 41.320, lng: 1.950 },
-    initialLocation: { lat: 41.320, lng: 1.950 },
+    location: { lat: 41.385, lng: 1.880 },
+    initialLocation: { lat: 41.385, lng: 1.880 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -62,8 +63,8 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '70 min',
     distance: '35.0 km',
-    location: { lat: 41.200, lng: 2.080 },
-    initialLocation: { lat: 41.200, lng: 2.080 },
+    location: { lat: 41.280, lng: 1.980 },
+    initialLocation: { lat: 41.280, lng: 1.980 },
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',
@@ -91,26 +92,29 @@ const ERDashboard = () => {
 
   const [showAttribution, setShowAttribution] = useState(false);
 
-  // Sort patients to prioritize real patients first
-  const sortedPatients = [...patients].sort((a, b) => {
-    const aIsReal = !a.phoneNumber.startsWith('mock-');
-    const bIsReal = !b.phoneNumber.startsWith('mock-');
-    if (aIsReal && !bIsReal) return -1;
-    if (!aIsReal && bIsReal) return 1;
-    return 0;
-  });
+  // Sort patients: real patient (Joe Bloggs) always first, then rotate mock patients
+  const realPatient = patients.find(p => !p.phoneNumber.startsWith('mock-'));
+  const mockPatients = patients.filter(p => p.phoneNumber.startsWith('mock-'));
+  
+  const sortedPatients = realPatient ? [realPatient, ...mockPatients] : mockPatients;
 
-  // Patient rotation timer with critical patient priority
+  // Patient rotation timer - only rotate mock patients (skip index 0 if real patient exists)
   useEffect(() => {
-    const getCurrentPatient = () => sortedPatients[currentPatientIndex];
-    const isCritical = getCurrentPatient()?.esi === 1;
-    const displayTime = isCritical ? 10000 : 5000; // Critical patients display for 10 seconds
+    if (sortedPatients.length <= 1) return;
     
     const rotationTimer = setInterval(() => {
-      setCurrentPatientIndex(prev => (prev + 1) % sortedPatients.length);
-    }, displayTime);
+      setCurrentPatientIndex(prev => {
+        const nextIndex = prev + 1;
+        // If we have a real patient, rotate only through mock patients (indices 1+)
+        if (realPatient) {
+          return nextIndex >= sortedPatients.length ? 1 : nextIndex;
+        }
+        // Otherwise rotate through all
+        return nextIndex >= sortedPatients.length ? 0 : nextIndex;
+      });
+    }, 5000);
     return () => clearInterval(rotationTimer);
-  }, [sortedPatients.length, currentPatientIndex]);
+  }, [sortedPatients.length, realPatient]);
 
   // Real-time clock
   useEffect(() => {
@@ -131,9 +135,9 @@ const ERDashboard = () => {
               // Reset to starting position when very close to hospital
               const newEta = Math.floor(Math.random() * 20) + 55;
               const directions = [
-                { lat: 41.550, lng: 2.350 },
-                { lat: 41.320, lng: 1.950 },
-                { lat: 41.200, lng: 2.080 }
+                { lat: 41.520, lng: 1.950 },
+                { lat: 41.385, lng: 1.880 },
+                { lat: 41.280, lng: 1.980 }
               ];
               const randomDirection = directions[Math.floor(Math.random() * directions.length)];
               return { ...patient, eta: `${newEta} min`, location: randomDirection };
@@ -159,9 +163,7 @@ const ERDashboard = () => {
     channelRef.current = new BroadcastChannel('healthcare_demo_sync_v2');
     channelRef.current.onmessage = (event) => {
       const { type, data } = event.data;
-      if (type === 'SET_HOSPITAL_LOCATION') {
-        setHospitalLocation(data);
-      } else if (type === 'PATIENT_ADMITTED') {
+      if (type === 'PATIENT_ADMITTED') {
         setPatients(prev => {
           const exists = prev.find(p => p.phoneNumber === data.phoneNumber);
           if (exists) {
@@ -182,6 +184,14 @@ const ERDashboard = () => {
         setShowGeofenceCircle(true);
       } else if (type === 'REMOVE_PATIENT') {
         setPatients(prev => prev.filter(p => p.phoneNumber !== data.phoneNumber));
+        // Clear selected patient and detail card if it's the one being removed
+        setSelectedPatient(prev => {
+          if (prev?.phoneNumber === data.phoneNumber) {
+            setShowDetailCard(false);
+            return null;
+          }
+          return prev;
+        });
       }
     };
     return () => channelRef.current?.close();
@@ -200,72 +210,79 @@ const ERDashboard = () => {
   // Initialize map and markers
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
-      const map = L.map(mapRef.current).setView([hospitalLocation.lat, hospitalLocation.lng], 12);
+      const map = L.map(mapRef.current).setView([MAP_CENTER.lat, MAP_CENTER.lng], 10);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
       }).addTo(map);
       mapInstanceRef.current = map;
     }
+  }, []);
 
-    // Update markers when patients or hospital location changes
-    if (mapInstanceRef.current) {
-      // Clear existing markers
-      mapInstanceRef.current.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-          mapInstanceRef.current.removeLayer(layer);
-        }
-      });
+  // Update markers separately without reinitializing map
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
 
-      // Add hospital marker
-      const hospitalIcon = L.divIcon({
-        html: '<div style="background: white; border: 2px solid #007bff; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(0, 123, 255, 0.8);">🏥</div>',
-        className: 'hospital-marker',
-        iconSize: [35, 35]
-      });
-      L.marker([hospitalLocation.lat, hospitalLocation.lng], { icon: hospitalIcon })
-        .addTo(mapInstanceRef.current)
-        .bindPopup('Hospital Emergency Department - Barcelona');
-
-      // Add patient/ambulance markers
-      patients.forEach(patient => {
-        if (patient.location) {
-          // Show ambulance icon for incoming patients, patient icon for checked-in/leaving patients
-          const isLeaving = patient.status === 'LEFT_AMA';
-          const isCheckedIn = patient.status === 'CHECKED_IN';
-          
-          if (!isCheckedIn && !isLeaving) {
-            // Incoming ambulance
-            const ambulanceMarker = L.divIcon({
-              html: '<div style="background: white; border: 2px solid #dc3545; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(220, 53, 69, 0.8);">🚑</div>',
-              className: 'ambulance-marker',
-              iconSize: [30, 30]
-            });
-            L.marker([patient.location.lat, patient.location.lng], { icon: ambulanceMarker })
-              .addTo(mapInstanceRef.current)
-              .bindPopup(`${patient.name}<br/>ESI-${patient.esi}<br/>ETA: ${patient.eta}<br/>${patient.transport}`);
-          } else if (isLeaving) {
-            // Patient leaving (show patient icon)
-            const patientMarker = L.divIcon({
-              html: '<div style="background: white; border: 2px solid #FF6B35; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(255, 107, 53, 0.8);">🚶</div>',
-              className: 'patient-marker',
-              iconSize: [30, 30]
-            });
-            L.marker([patient.location.lat, patient.location.lng], { icon: patientMarker })
-              .addTo(mapInstanceRef.current)
-              .bindPopup(`${patient.name}<br/>LEFT AMA<br/>Contact: ${patient.phoneNumber}`);
-          }
-        }
-      });
-
-      // Add geofence circle if needed
-      if (showGeofenceCircle) {
-        L.circle([hospitalLocation.lat, hospitalLocation.lng], {
-          color: '#00d4ff',
-          fillColor: '#00d4ff',
-          fillOpacity: 0.1,
-          radius: 1000
-        }).addTo(mapInstanceRef.current);
+    // Clear existing markers and circles only
+    mapInstanceRef.current.eachLayer((layer) => {
+      if (layer instanceof L.Marker || layer instanceof L.Circle) {
+        mapInstanceRef.current.removeLayer(layer);
       }
+    });
+
+    // Add hospital marker
+    const hospitalIcon = L.divIcon({
+      html: '<div style="background: white; border: 2px solid #007bff; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(0, 123, 255, 0.8);">🏥</div>',
+      className: 'hospital-marker',
+      iconSize: [35, 35]
+    });
+    L.marker([hospitalLocation.lat, hospitalLocation.lng], { icon: hospitalIcon })
+      .addTo(mapInstanceRef.current)
+      .bindPopup('Hospital Emergency Department - Barcelona');
+
+    // Add patient/ambulance markers
+    patients.forEach(patient => {
+      if (patient.location) {
+        const isLeaving = patient.status === 'LEFT_AMA';
+        const isCheckedIn = patient.status === 'CHECKED_IN';
+        
+        if (!isCheckedIn && !isLeaving) {
+          // Determine ambulance color based on ESI level
+          let ambulanceColor = '#dc3545'; // Default red
+          if (patient.esi === 2) {
+            ambulanceColor = '#FD7E14'; // Orange for ESI-2 (Urgent)
+          } else if (patient.esi === 3) {
+            ambulanceColor = '#FFC107'; // Yellow for ESI-3 (Moderate)
+          }
+          
+          const ambulanceMarker = L.divIcon({
+            html: `<div style="background: white; border: 2px solid ${ambulanceColor}; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px ${ambulanceColor};">🚑</div>`,
+            className: 'ambulance-marker',
+            iconSize: [30, 30]
+          });
+          L.marker([patient.location.lat, patient.location.lng], { icon: ambulanceMarker })
+            .addTo(mapInstanceRef.current)
+            .bindPopup(`${patient.name}<br/>ESI-${patient.esi}<br/>ETA: ${patient.eta}<br/>${patient.transport}`);
+        } else if (isLeaving) {
+          const patientMarker = L.divIcon({
+            html: '<div style="background: white; border: 2px solid #FF6B35; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(255, 107, 53, 0.8);">🚶</div>',
+            className: 'patient-marker',
+            iconSize: [30, 30]
+          });
+          L.marker([patient.location.lat, patient.location.lng], { icon: patientMarker })
+            .addTo(mapInstanceRef.current)
+            .bindPopup(`${patient.name}<br/>LEFT AMA<br/>Contact: ${patient.phoneNumber}`);
+        }
+      }
+    });
+
+    // Add geofence circle if needed
+    if (showGeofenceCircle) {
+      L.circle([hospitalLocation.lat, hospitalLocation.lng], {
+        color: '#00d4ff',
+        fillColor: '#00d4ff',
+        fillOpacity: 0.1,
+        radius: 1000
+      }).addTo(mapInstanceRef.current);
     }
   }, [hospitalLocation, patients, showGeofenceCircle]);
 
@@ -416,30 +433,31 @@ const ERDashboard = () => {
                     )}
                     {sortedPatients.length > 0 && (
                       <>
+                        {/* First patient card - always real patient (Joe Bloggs) if exists */}
                         <div 
-                          key={sortedPatients[currentPatientIndex].id} 
-                          className={`patient-card ${sortedPatients[currentPatientIndex].esi === 1 ? 'pulse-animation' : ''} ${sortedPatients[currentPatientIndex].status === 'CHECKED_IN' ? 'checked-in' : ''} ${sortedPatients[currentPatientIndex].status === 'LEFT_AMA' ? 'left-ama' : ''}`}
+                          key={sortedPatients[0].id} 
+                          className={`patient-card ${sortedPatients[0].esi === 1 ? 'pulse-animation' : ''} ${sortedPatients[0].status === 'CHECKED_IN' ? 'checked-in' : ''} ${sortedPatients[0].status === 'LEFT_AMA' ? 'left-ama' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedPatient(sortedPatients[currentPatientIndex]);
+                            setSelectedPatient(sortedPatients[0]);
                             setShowDetailCard(true);
                           }}
-                          style={{ borderLeftColor: getESIColor(sortedPatients[currentPatientIndex].esi) }}
+                          style={{ borderLeftColor: getESIColor(sortedPatients[0].esi) }}
                         >
                           <div className="patient-header">
                             <div className="patient-info">
                               <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
-                                <span>{sortedPatients[currentPatientIndex].name} ({sortedPatients[currentPatientIndex].age})</span>
-                                {sortedPatients[currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[currentPatientIndex].id}</span>}
+                                <span>{sortedPatients[0].name} ({sortedPatients[0].age})</span>
+                                {sortedPatients[0].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[0].id}</span>}
                                 {/* Check-in button only when patient arrives at hospital */}
-                                {!sortedPatients[currentPatientIndex].phoneNumber.startsWith('mock-') && 
-                                 sortedPatients[currentPatientIndex].status === 'ARRIVED' && (
+                                {!sortedPatients[0].phoneNumber.startsWith('mock-') && 
+                                 sortedPatients[0].status === 'ARRIVED' && (
                                   <button 
                                     className="checkin-button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      console.log('Check-in clicked for:', sortedPatients[currentPatientIndex].name);
-                                      handleCheckIn(sortedPatients[currentPatientIndex]);
+                                      console.log('Check-in clicked for:', sortedPatients[0].name);
+                                      handleCheckIn(sortedPatients[0]);
                                     }}
                                     style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                   >
@@ -450,56 +468,56 @@ const ERDashboard = () => {
                             </div>
                             <span 
                               className="status-badge" 
-                              style={{ backgroundColor: getStatusBadge(sortedPatients[currentPatientIndex].status) }}
+                              style={{ backgroundColor: getStatusBadge(sortedPatients[0].status) }}
                             >
-                              {sortedPatients[currentPatientIndex].status === 'CHECKED_IN' ? 'In Treatment' : sortedPatients[currentPatientIndex].status === 'LEFT_AMA' ? 'Left AMA' : sortedPatients[currentPatientIndex].status}
+                              {sortedPatients[0].status === 'CHECKED_IN' ? 'In Treatment' : sortedPatients[0].status === 'LEFT_AMA' ? 'Left AMA' : sortedPatients[0].status}
                             </span>
                           </div>
                           
                           <div className="patient-details">
                             <div className="detail-row">
                               <span className="label">ESI Level:</span>
-                              <span className="value" style={{ color: getESIColor(sortedPatients[currentPatientIndex].esi) }}>
-                                <strong>ESI-{sortedPatients[currentPatientIndex].esi}</strong>
+                              <span className="value" style={{ color: getESIColor(sortedPatients[0].esi) }}>
+                                <strong>ESI-{sortedPatients[0].esi}</strong>
                               </span>
                             </div>
                             <div className="detail-row">
                               <span className="label">ETA:</span>
-                              <span className="value eta">{sortedPatients[currentPatientIndex].eta}</span>
+                              <span className="value eta">{sortedPatients[0].eta}</span>
                             </div>
                           </div>
 
                           <div className="patient-complaint">
-                            <strong>Chief Complaint:</strong> {sortedPatients[currentPatientIndex].complaint}
+                            <strong>Chief Complaint:</strong> {sortedPatients[0].complaint}
                           </div>
                         </div>
                         
-                        {/* Second patient if available */}
+                        {/* Second patient - rotating through remaining mock patients */}
                         {sortedPatients.length > 1 && (
                           <div 
-                            key={sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id} 
-                            className={`patient-card ${sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].esi === 1 ? 'pulse-animation' : ''} ${sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status === 'CHECKED_IN' ? 'checked-in' : ''} ${sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status === 'LEFT_AMA' ? 'left-ama' : ''}`}
+                            key={sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id} 
+                            className={`patient-card ${sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi === 1 ? 'pulse-animation' : ''} ${sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'CHECKED_IN' ? 'checked-in' : ''} ${sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'LEFT_AMA' ? 'left-ama' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedPatient(sortedPatients[(currentPatientIndex + 1) % sortedPatients.length]);
+                              setSelectedPatient(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex]);
                               setShowDetailCard(true);
                             }}
-                            style={{ borderLeftColor: getESIColor(sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].esi) }}
+                            style={{ borderLeftColor: getESIColor(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi) }}
                           >
                             <div className="patient-header">
                               <div className="patient-info">
                                 <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
-                                  <span>{sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].name} ({sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].age})</span>
-                                  {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].id}</span>}
+                                  <span>{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name} ({sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].age})</span>
+                                  {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id}</span>}
                                   {/* Check-in button only when patient arrives at hospital */}
-                                  {!sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].phoneNumber.startsWith('mock-') && 
-                                   sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status === 'ARRIVED' && (
+                                  {!sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].phoneNumber.startsWith('mock-') && 
+                                   sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'ARRIVED' && (
                                     <button 
                                       className="checkin-button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        console.log('Check-in clicked for:', sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].name);
-                                        handleCheckIn(sortedPatients[(currentPatientIndex + 1) % sortedPatients.length]);
+                                        console.log('Check-in clicked for:', sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name);
+                                        handleCheckIn(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex]);
                                       }}
                                       style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                     >
@@ -510,64 +528,66 @@ const ERDashboard = () => {
                               </div>
                               <span 
                                 className="status-badge" 
-                                style={{ backgroundColor: getStatusBadge(sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status) }}
+                                style={{ backgroundColor: getStatusBadge(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status) }}
                               >
-                                {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status === 'CHECKED_IN' ? 'In Treatment' : sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status === 'LEFT_AMA' ? 'Left AMA' : sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].status}
+                                {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'CHECKED_IN' ? 'In Treatment' : sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'LEFT_AMA' ? 'Left AMA' : sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status}
                               </span>
                             </div>
                             
                             <div className="patient-details">
                               <div className="detail-row">
                                 <span className="label">ESI Level:</span>
-                                <span className="value" style={{ color: getESIColor(sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].esi) }}>
-                                  <strong>ESI-{sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].esi}</strong>
+                                <span className="value" style={{ color: getESIColor(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi) }}>
+                                  <strong>ESI-{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi}</strong>
                                 </span>
                               </div>
                               <div className="detail-row">
                                 <span className="label">ETA:</span>
-                                <span className="value eta">{sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].eta}</span>
+                                <span className="value eta">{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].eta}</span>
                               </div>
                             </div>
 
                             <div className="patient-complaint">
-                              <strong>Chief Complaint:</strong> {sortedPatients[(currentPatientIndex + 1) % sortedPatients.length].complaint}
+                              <strong>Chief Complaint:</strong> {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].complaint}
                             </div>
                           </div>
                         )}
                       </>
                     )}
                     {/* Current Patient Alert */}
-                    {sortedPatients.length > 0 && (
+                    {sortedPatients.length > 0 && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex] && (
                       <div className="alert-panel" style={{ marginTop: '0.5rem' }}>
                         <h3>⚠️ Current Patient Alert</h3>
-                        {sortedPatients[currentPatientIndex].status === 'LEFT_AMA' && (
+                        {/* Show LEFT_AMA alert for index 0 patient if they have that status */}
+                        {sortedPatients[0].status === 'LEFT_AMA' && (
                           <div className="alert-item" style={{ background: 'rgba(255, 107, 53, 0.3)', borderLeft: '2px solid #FF6B35' }}>
                             <strong>🚶 PATIENT LEFT AMA</strong>
-                            <p>{sortedPatients[currentPatientIndex].name} - Left Against Medical Advice</p>
-                            <p className="alert-action">📞 Contact patient immediately: {sortedPatients[currentPatientIndex].phoneNumber}</p>
+                            <p>{sortedPatients[0].name} - Left Against Medical Advice</p>
+                            <p className="alert-action">📞 Contact patient immediately: {sortedPatients[0].phoneNumber}</p>
                           </div>
                         )}
-                        {sortedPatients[currentPatientIndex].esi === 1 && sortedPatients[currentPatientIndex].status !== 'LEFT_AMA' && (
+                        {/* Show rotating patient alerts only if index 0 doesn't have LEFT_AMA */}
+                        {sortedPatients[0].status !== 'LEFT_AMA' && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi === 1 && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status !== 'LEFT_AMA' && (
                           <div className="alert-item critical">
                             <strong>🚨 CRITICAL ARRIVAL</strong>
-                            <p>{sortedPatients[currentPatientIndex].name} - ESI-{sortedPatients[currentPatientIndex].esi} - ETA {sortedPatients[currentPatientIndex].eta}</p>
+                            <p>{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name} - ESI-{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi} - ETA {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].eta}</p>
                             <p className="alert-action">⚠️ Prepare Trauma Room</p>
                           </div>
                         )}
-                        {sortedPatients[currentPatientIndex].esi === 2 && sortedPatients[currentPatientIndex].status !== 'LEFT_AMA' && (
+                        {sortedPatients[0].status !== 'LEFT_AMA' && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi === 2 && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status !== 'LEFT_AMA' && (
                           <div className="alert-item urgent">
                             <strong>⚠️ URGENT ARRIVAL</strong>
-                            <p>{sortedPatients[currentPatientIndex].name} - ESI-{sortedPatients[currentPatientIndex].esi} - ETA {sortedPatients[currentPatientIndex].eta}</p>
+                            <p>{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name} - ESI-{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi} - ETA {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].eta}</p>
                             <p className="alert-action">👉 Prepare treatment area</p>
                           </div>
                         )}
-                        {sortedPatients[currentPatientIndex].esi > 2 && sortedPatients[currentPatientIndex].status !== 'LEFT_AMA' && (
+                        {sortedPatients[0].status !== 'LEFT_AMA' && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi > 2 && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status !== 'LEFT_AMA' && (
                           <div className="alert-item" style={{ background: 'rgba(40, 167, 69, 0.2)', borderLeft: '2px solid #28a745' }}>
                             <strong>✅ STANDARD ARRIVAL</strong>
-                            <p>{sortedPatients[currentPatientIndex].name} - ESI-{sortedPatients[currentPatientIndex].esi} - ETA {sortedPatients[currentPatientIndex].eta}</p>
+                            <p>{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name} - ESI-{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi} - ETA {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].eta}</p>
                             <p className="alert-action">📋 Standard preparation</p>
                           </div>
-                        )}  
+                        )}
                       </div>
                     )}
                   </div>
@@ -647,32 +667,32 @@ const ERDashboard = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
                   <div>
                     <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>ESI Level:</strong>
-                    <p style={{ backgroundColor: '#ffe6e6', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getESIColor(selectedPatient.esi) }}>
-                      ESI-{selectedPatient.esi}
+                    <p style={{ backgroundColor: '#ffe6e6', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getESIColor(selectedPatient.esi || 3) }}>
+                      ESI-{selectedPatient.esi || 'N/A'}
                     </p>
                   </div>
                   <div>
                     <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Status:</strong>
-                    <p style={{ backgroundColor: '#e3f2fd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getStatusBadge(selectedPatient.status) }}>
-                      {selectedPatient.status}
+                    <p style={{ backgroundColor: '#e3f2fd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getStatusBadge(selectedPatient.status || 'UNKNOWN') }}>
+                      {selectedPatient.status || 'N/A'}
                     </p>
                   </div>
                   <div>
                     <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>ETA:</strong>
                     <p style={{ backgroundColor: '#fff3e0', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.eta}
+                      {selectedPatient.eta || 'N/A'}
                     </p>
                   </div>
                   <div>
                     <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Distance:</strong>
                     <p style={{ backgroundColor: '#f3e5f5', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.distance}
+                      {selectedPatient.distance || 'N/A'}
                     </p>
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Transport:</strong>
                     <p style={{ backgroundColor: '#e8f5e9', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.transport}
+                      {selectedPatient.transport || 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -680,14 +700,14 @@ const ERDashboard = () => {
                 <div style={{ marginBottom: '0.4rem' }}>
                   <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
                   <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
-                    {selectedPatient.complaint}
+                    {selectedPatient.complaint || 'N/A'}
                   </p>
                 </div>
                 
                 <div style={{ marginBottom: '0.4rem' }}>
                   <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
                   <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
-                    {selectedPatient.vitals}
+                    {selectedPatient.vitals || 'N/A'}
                   </p>
                 </div>
               </div>
@@ -702,7 +722,7 @@ const ERDashboard = () => {
                   </div>
                 )}
                 
-                {selectedPatient.specialistsNeeded && (
+                {selectedPatient.specialistsNeeded && selectedPatient.specialistsNeeded.length > 0 && (
                   <div style={{ marginBottom: '0.4rem' }}>
                     <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Specialists Required:</strong>
                     <p style={{ backgroundColor: '#e1f5fe', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
@@ -711,7 +731,7 @@ const ERDashboard = () => {
                   </div>
                 )}
                 
-                {selectedPatient.equipmentNeeded && (
+                {selectedPatient.equipmentNeeded && selectedPatient.equipmentNeeded.length > 0 && (
                   <div style={{ marginBottom: '0.4rem' }}>
                     <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Equipments Required:</strong>
                     <p style={{ backgroundColor: '#fce4ec', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>

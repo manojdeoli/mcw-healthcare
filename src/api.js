@@ -464,11 +464,11 @@ export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage,
     }
 
     addMessage("Creating Geofencing Subscription for patient monitoring...");
-    const geoSub = await createGeofencingSubscription(phoneNumber, hospitalLocation.lat, hospitalLocation.lng, 500);
+    const geoSub = await createGeofencingSubscription(phoneNumber, hospitalLocation.lat, hospitalLocation.lng, 1000);
     
     // Broadcast to ER Dashboard to show geofencing circle
     if (broadcast) {
-        broadcast('SHOW_GEOFENCE_CIRCLE', { radius: 500 });
+        broadcast('SHOW_GEOFENCE_CIRCLE', { radius: 1000 });
     }
     if (logApi) logApi('Create Geofencing Subscription', 'POST', '/geofencing-subscriptions/v0.3/subscriptions', {
         protocol: "HTTP",
@@ -480,7 +480,7 @@ export async function completeCheckIn(phoneNumber, hospitalLocation, addMessage,
                 area: {
                     areaType: "CIRCLE",
                     center: { latitude: hospitalLocation.lat, longitude: hospitalLocation.lng },
-                    radius: 500
+                    radius: 1000
                 }
             },
             initialEvent: true,
@@ -671,10 +671,11 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     // Ensure patient is at hospital initially
     setUserGps(hospitalLocation);
     
-    // Broadcast initial hospital location to ER Dashboard with CHECKED_IN status
+    // Broadcast initial hospital location to ER Dashboard with CHECKED_IN status and patient name
     if (broadcast) {
         broadcast('PATIENT_STATUS_UPDATE', {
             phoneNumber: phoneNumber,
+            name: guestName,
             location: hospitalLocation,
             status: 'CHECKED_IN'
         });
@@ -689,14 +690,14 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     const checkoutTime = new Date(`${datePrefix}T10:45:00`);
     setArtificialTime(checkoutTime);
     
-    // Generate route moving away from hospital
+    // Generate route moving away from hospital (move farther - south-east direction)
     const destination = {
-        lat: hospitalLocation.lat + 0.015,
-        lng: hospitalLocation.lng + 0.015
+        lat: hospitalLocation.lat - 0.04,
+        lng: hospitalLocation.lng + 0.055
     };
 
-    const route = generateRoute(hospitalLocation, destination, 4); // Route from hospital to outside
-    const geofenceRadius = 500;
+    const route = generateRoute(hospitalLocation, destination, 4); // Fewer steps for faster movement
+    const geofenceRadius = 1000; // Increased to 1000m to match ER Dashboard geofence circle
     let geofenceBreached = false;
 
     for (let i = 0; i < route.length; i++) {
@@ -713,27 +714,30 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
         setUserGps(currentLocation);
         addMessage(`Patient location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`);
 
-        // Broadcast location update to ER Dashboard
+        // Broadcast location update to ER Dashboard with patient name
         if (broadcast) {
             broadcast('PATIENT_STATUS_UPDATE', {
                 phoneNumber: phoneNumber,
+                name: guestName,
                 location: currentLocation
             });
         }
 
-        // Check Geofence
+        // Check Geofence - only change status after step 2 (patient has moved significantly away)
         const distance = getDistanceFromLatLonInMeters(hospitalLocation.lat, hospitalLocation.lng, currentLocation.lat, currentLocation.lng);
         
-        if (!geofenceBreached && distance > geofenceRadius) {
+        if (!geofenceBreached && distance > geofenceRadius && i >= 2) {
             geofenceBreached = true;
             addMessage(`Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`);
             setPatientMedicalDetails({ patientId: '', alert: `Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
             
-            // Broadcast LEFT_AMA status to ER Dashboard
+            // Broadcast LEFT_AMA status to ER Dashboard with patient name
             if (broadcast) {
                 broadcast('PATIENT_STATUS_UPDATE', {
                     phoneNumber: phoneNumber,
-                    status: 'LEFT_AMA'
+                    name: guestName,
+                    status: 'LEFT_AMA',
+                    eta: 'Absconding'
                 });
             }
         }
@@ -1062,7 +1066,6 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
         }
 
         if (logApi) logApi('Device Status', 'POST', '/device-status/device-reachability-status/v1/retrieve', { device: { phoneNumber } }, devRes);
-        if (logApi) logApi('Device Connectivity', 'POST', '/device-status/v0/connectivity', { device: { phoneNumber } }, connRes);
 
         if (devRes.reachable === 'false' || connRes.connectivityStatus === 'NOT_CONNECTED') {
                 addMessage("!!! ANOMALY DETECTED: Device Unreachable / Not Connected !!!");
