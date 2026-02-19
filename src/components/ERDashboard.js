@@ -18,8 +18,8 @@ const mockAdditionalPatients = [
     status: 'URGENT',
     eta: '55 min',
     distance: '27.5 km',
-    location: { lat: 41.430, lng: 2.220 }, // North-East of hospital (farther)
-    initialLocation: { lat: 41.430, lng: 2.220 },
+    location: { lat: 41.550, lng: 2.350 },
+    initialLocation: { lat: 41.550, lng: 2.350 },
     vitals: '♥ HR: 145/95 bpm | 🩸 BP: 98 mmHg | 🫁 O₂: 94% | 🌡 T: 37.2°C',
     complaint: 'Severe abdominal pain, possible appendicitis',
     transport: 'Ambulance #A-153',
@@ -40,8 +40,8 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '62 min',
     distance: '31.0 km',
-    location: { lat: 41.395, lng: 2.110 }, // West of hospital (farther)
-    initialLocation: { lat: 41.395, lng: 2.110 },
+    location: { lat: 41.320, lng: 1.950 },
+    initialLocation: { lat: 41.320, lng: 1.950 },
     vitals: '♥ HR: 88 bpm | 🩸 BP: 128/82 mmHg | 🫁 O₂: 97% | 🌡 T: 36.8°C',
     complaint: 'Fractured wrist from fall, stable',
     transport: 'Ambulance #A-089',
@@ -62,8 +62,8 @@ const mockAdditionalPatients = [
     status: 'MODERATE',
     eta: '70 min',
     distance: '35.0 km',
-    location: { lat: 41.340, lng: 2.120 }, // South-West of hospital (farther)
-    initialLocation: { lat: 41.340, lng: 2.120 },
+    location: { lat: 41.200, lng: 2.080 },
+    initialLocation: { lat: 41.200, lng: 2.080 },
     vitals: '♥ HR: 82 bpm | 🩸 BP: 135/85 mmHg | 🫁 O₂: 98% | 🌡 T: 37.0°C',
     complaint: 'Laceration requiring sutures, bleeding controlled',
     transport: 'Ambulance #A-201',
@@ -88,6 +88,8 @@ const ERDashboard = () => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const channelRef = useRef(null);
+
+  const [showAttribution, setShowAttribution] = useState(false);
 
   // Sort patients to prioritize real patients first
   const sortedPatients = [...patients].sort((a, b) => {
@@ -125,34 +127,30 @@ const ERDashboard = () => {
         if (patient.phoneNumber.startsWith('mock-')) {
           const currentEta = parseInt(patient.eta);
           if (!isNaN(currentEta)) {
-            let newEta, newLocation;
             if (currentEta <= 5) {
               // Reset to starting position when very close to hospital
               const newEta = Math.floor(Math.random() * 20) + 55;
-              // Generate random starting position around hospital (farther)
               const directions = [
-                { lat: 41.430, lng: 2.220 },  // North-East
-                { lat: 41.395, lng: 2.110 },  // West
-                { lat: 41.340, lng: 2.120 }   // South-West
+                { lat: 41.550, lng: 2.350 },
+                { lat: 41.320, lng: 1.950 },
+                { lat: 41.200, lng: 2.080 }
               ];
               const randomDirection = directions[Math.floor(Math.random() * directions.length)];
-              newLocation = randomDirection;
+              return { ...patient, eta: `${newEta} min`, location: randomDirection };
             } else {
               // Move closer to hospital
-              newEta = currentEta - 1;
-              const currentLat = patient.location.lat;
-              const currentLng = patient.location.lng;
-              newLocation = {
-                lat: currentLat + (HOSPITAL_LOCATION.lat - currentLat) * 0.05,
-                lng: currentLng + (HOSPITAL_LOCATION.lng - currentLng) * 0.05
+              const newEta = currentEta - 1;
+              const newLocation = {
+                lat: patient.location.lat + (HOSPITAL_LOCATION.lat - patient.location.lat) * 0.05,
+                lng: patient.location.lng + (HOSPITAL_LOCATION.lng - patient.location.lng) * 0.05
               };
+              return { ...patient, eta: `${newEta} min`, location: newLocation };
             }
-            return { ...patient, eta: `${newEta} min`, location: newLocation };
           }
         }
         return patient;
       }));
-    }, 15000); // Update every 15 seconds
+    }, 15000);
     return () => clearInterval(etaTimer);
   }, []);
 
@@ -304,19 +302,78 @@ const ERDashboard = () => {
 
   return (
     <div className="er-dashboard">
-      {/* Fullscreen Video Background */}
-      <video 
-        autoPlay 
-        loop 
-        muted 
-        playsInline
+      {/* Fullscreen Static Image Background */}
+      <div 
         className="video-background"
-      >
-        <source src="/Hospital_ER_Video.mp4" type="video/mp4" />
-      </video>
+        style={{
+          backgroundImage: 'url(/ER_Back.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      ></div>
       
-      {/* Overlay to hide watermark */}
-      <div className="video-overlay"></div>
+      {/* Attribution Button */}
+      <button
+        onClick={() => setShowAttribution(!showAttribution)}
+        style={{
+          position: 'fixed',
+          bottom: '10px',
+          left: '10px',
+          background: 'rgba(0, 0, 0, 0.6)',
+          color: 'white',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          borderRadius: '4px',
+          padding: '5px 10px',
+          fontSize: '0.7rem',
+          cursor: 'pointer',
+          zIndex: 10
+        }}
+      >
+        ℹ️ Image Attribution
+      </button>
+
+      {/* Attribution Popup */}
+      {showAttribution && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '50px',
+            left: '10px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #007bff',
+            borderRadius: '8px',
+            padding: '15px',
+            maxWidth: '350px',
+            zIndex: 11,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            fontSize: '0.75rem',
+            color: '#000'
+          }}
+        >
+          <button
+            onClick={() => setShowAttribution(false)}
+            style={{
+              position: 'absolute',
+              top: '5px',
+              right: '10px',
+              background: 'none',
+              border: 'none',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              color: '#666'
+            }}
+          >
+            ×
+          </button>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Image Source:</div>
+          <div style={{ marginBottom: '10px' }}>AI-generated using OpenAI DALL·E</div>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Generation Method:</div>
+          <div style={{ marginBottom: '10px' }}>Created from a custom prompt describing a photorealistic hospital emergency room management environment designed for UI overlay demonstrations.</div>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Content Note:</div>
+          <div>The image is fully synthetic and created for internal demonstration and visualization purposes.</div>
+        </div>
+      )}
       
       {/* Monitor Content Overlay */}
       <div className="monitor-screen">
@@ -551,10 +608,10 @@ const ERDashboard = () => {
         {showDetailCard && selectedPatient && (
           <div className="patient-detail-popup" style={{
             position: 'absolute',
-            top: '15%',
+            top: '5%',
             left: '10%',
             width: '80%',
-            height: '70%',
+            height: '90%',
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
             border: '2px solid #007bff',
             borderRadius: '8px',
