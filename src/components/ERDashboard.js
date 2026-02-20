@@ -116,6 +116,13 @@ const ERDashboard = () => {
     return () => clearInterval(rotationTimer);
   }, [sortedPatients.length, realPatient]);
 
+  // Reset currentPatientIndex if it's out of bounds
+  useEffect(() => {
+    if (currentPatientIndex >= sortedPatients.length) {
+      setCurrentPatientIndex(realPatient ? 1 : 0);
+    }
+  }, [sortedPatients.length, currentPatientIndex, realPatient]);
+
   // Real-time clock
   useEffect(() => {
     const timer = setInterval(() => {
@@ -493,7 +500,7 @@ const ERDashboard = () => {
                         </div>
                         
                         {/* Second patient - rotating through remaining mock patients */}
-                        {sortedPatients.length > 1 && (
+                        {sortedPatients.length > 1 && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex] && (
                           <div 
                             key={sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id} 
                             className={`patient-card ${sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi === 1 ? 'pulse-animation' : ''} ${sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'CHECKED_IN' ? 'checked-in' : ''} ${sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'LEFT_AMA' ? 'left-ama' : ''}`}
@@ -660,7 +667,21 @@ const ERDashboard = () => {
               ×
             </button>
             
-            <h2 style={{ marginTop: 0, color: '#000', fontSize: 'clamp(0.8rem, 1.3vw, 1.3rem)', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{selectedPatient.name} ({selectedPatient.age})</h2>
+            <h2 style={{ marginTop: 0, color: '#000', fontSize: 'clamp(0.8rem, 1.3vw, 1.3rem)', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>
+              {selectedPatient.name} ({selectedPatient.age})
+              {!selectedPatient.phoneNumber.startsWith('mock-') && selectedPatient.status === 'ARRIVED' && (
+                <button 
+                  className="checkin-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCheckIn(selectedPatient);
+                  }}
+                  style={{ marginLeft: '1rem' }}
+                >
+                  Check-In ✓
+                </button>
+              )}
+            </h2>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
               <div style={{ flex: 1 }}>

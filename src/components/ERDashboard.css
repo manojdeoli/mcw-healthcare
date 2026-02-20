@@ -677,16 +677,19 @@
   border: none;
   padding: 0.05rem 0.15rem;
   border-radius: 2px;
-  font-size: 0.5em;
-  font-weight: bold;
+  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
+  font-weight: 900;
   cursor: pointer;
   margin-top: 0;
+  margin-left: 0.3rem;
   width: auto;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(40, 167, 69, 0.3);
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.4);
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.5);
   display: inline-block;
   vertical-align: middle;
+  border: 2px solid #1e7e34;
+  letter-spacing: 0.5px;
 }
 
 .checkin-button:hover {
