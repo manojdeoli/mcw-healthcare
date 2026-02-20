@@ -321,15 +321,15 @@
 }
 
 .patient-card {
-  background: #ffffff;
+  background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
   color: #000;
   padding: 0.15rem;
   border-radius: 3px;
-  border-left: 3px solid;
+  border-left: 3px solid #2E7D32;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 3px 8px rgba(46, 125, 50, 0.3);
+  border: 2px solid #4CAF50;
   margin-bottom: 0.15rem;
   font-size: 0.15rem;
   -webkit-font-smoothing: antialiased;
@@ -338,10 +338,9 @@
 
 .patient-info h3 {
   margin: 0;
-  font-size: clamp(0.6rem, 1vw, 1rem);
-  font-weight: 900;
+  font-size: clamp(0.7rem, 1.1vw, 1.1rem);
+  font-weight: 1000;
   color: #000;
-  text-shadow: 0 0 3px #fff, 0 0 5px #fff;
   letter-spacing: 0.5px;
 }
 
@@ -366,36 +365,35 @@
 .detail-row {
   display: flex;
   justify-content: space-between;
-  font-size: clamp(0.5rem, 0.85vw, 0.85rem);
+  font-size: clamp(0.55rem, 0.9vw, 0.9rem);
   padding: 0.15rem;
-  background: #e0e0e0;
+  background: rgba(255, 255, 255, 0.7);
   border-radius: 3px;
+  border: 1px solid rgba(46, 125, 50, 0.2);
 }
 
 .detail-row .label {
   color: #000;
-  font-weight: 900;
-  text-shadow: 0 0 3px #fff, 0 0 5px #fff;
+  font-weight: 1000;
   letter-spacing: 0.5px;
 }
 
 .detail-row .value {
-  font-weight: 900;
+  font-weight: 1000;
   color: #000;
-  text-shadow: 0 0 3px #fff, 0 0 5px #fff;
   letter-spacing: 0.5px;
 }
 
 .patient-complaint {
-  background: #b3e5fc;
+  background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%);
   padding: 0.2rem;
   border-radius: 3px;
-  font-size: clamp(0.55rem, 0.9vw, 0.9rem);
+  font-size: clamp(0.6rem, 0.95vw, 0.95rem);
   margin-top: 0.1rem;
   color: #000;
-  font-weight: 900;
-  border-left: 3px solid #0066cc;
-  text-shadow: 0 0 3px #fff, 0 0 5px #fff;
+  font-weight: 1000;
+  border-left: 3px solid #F57F17;
+  border: 1px solid #FBC02D;
   letter-spacing: 0.5px;
 }
 
@@ -438,7 +436,7 @@
   gap: 0.1rem;
   margin-bottom: 0.1rem;
   padding: 0.1rem;
-  background: rgba(0, 0, 0, 0.02);
+  background: transparent;
   border-radius: 3px;
 }
 
