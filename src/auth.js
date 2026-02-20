@@ -246,20 +246,32 @@ class AuthService {
         this.isAuthenticating = true;
         
         try {
+            console.log('🔑 Step 1: Getting client credentials for phone:', phoneNumber);
             await this.getClientCredentials();
+            console.log('✅ Step 1 complete - Client credentials received');
+            
+            console.log('🌐 Step 2: Getting endpoints...');
             await this.getEndpoints();
+            console.log('✅ Step 2 complete - Endpoints received');
             
+            console.log('🔗 Step 3: Generating authorization URL...');
             const { authUrl, redirectUri } = this.getAuthorizationUrl(phoneNumber);
+            console.log('✅ Step 3 complete - Auth URL:', authUrl);
             
+            // Save to sessionStorage for callback handling
+            console.log('💾 Saving auth state to sessionStorage...');
             sessionStorage.setItem('auth_phone', phoneNumber);
             sessionStorage.setItem('auth_redirect_uri', redirectUri);
             sessionStorage.setItem('auth_credentials', JSON.stringify(this.clientCredentials));
             sessionStorage.setItem('auth_endpoints', JSON.stringify(this.endpoints));
+            console.log('✅ Auth state saved to sessionStorage');
             
+            console.log('🚀 Redirecting to OAuth provider...');
             window.location.href = authUrl;
             
             return new Promise(() => {});
         } catch (error) {
+            console.error('❌ Authentication failed at setup stage:', error);
             this.isAuthenticating = false;
             throw new Error(`Authentication failed: ${error.message}`);
         }
@@ -268,8 +280,27 @@ class AuthService {
     async checkAndHandleCallback() {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
+        const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
         
-        console.log('🔍 Checking for OAuth callback...', { code, url: window.location.href });
+        console.log('🔍 Checking for OAuth callback...', { code, error, errorDescription, url: window.location.href });
+        
+        // Handle OAuth error responses
+        if (error) {
+            console.error('❌ OAuth Error:', error, errorDescription);
+            const errorMsg = `Authentication failed: ${error}${errorDescription ? ' - ' + errorDescription : ''}`;
+            
+            // Clear any stale session data
+            sessionStorage.clear();
+            this.isAuthenticating = false;
+            
+            // Show user-friendly error
+            alert(`Authentication Error:\n\n${errorMsg}\n\nThis may be due to:\n- Phone number not supported by the OAuth provider\n- Browser security settings blocking the authentication\n- Network/proxy issues\n\nPlease try:\n1. Using a different phone number\n2. Clearing browser cache and cookies\n3. Trying a different browser`);
+            
+            // Redirect to home page
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return { error: errorMsg };
+        }
         
         if (code) {
             console.log('✅ Code found in URL:', code);

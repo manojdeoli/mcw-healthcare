@@ -528,7 +528,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
 
     for (let i = 0; i < route.length; i++) {
         const step = timeSteps[i] || timeSteps[timeSteps.length - 1];
-        const currentLocation = route[i];
+        const currentLocation = (i === route.length - 1) ? hospitalLocation : route[i];
         const totalSteps = route.length -1;
         const stepsRemaining = totalSteps - i;
         const durationMinutes = Math.round(5 * stepsRemaining); // 5 mins per step
@@ -690,14 +690,15 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
     const checkoutTime = new Date(`${datePrefix}T10:45:00`);
     setArtificialTime(checkoutTime);
     
-    // Generate route moving away from hospital (move farther - south-east direction)
+    // Generate route moving away from hospital (northeast, staying in city)
+    // Increase distance to ensure patient moves outside 1000m geofence
     const destination = {
-        lat: hospitalLocation.lat - 0.04,
-        lng: hospitalLocation.lng + 0.055
+        lat: hospitalLocation.lat + 0.015,
+        lng: hospitalLocation.lng + 0.020
     };
 
-    const route = generateRoute(hospitalLocation, destination, 4); // Fewer steps for faster movement
-    const geofenceRadius = 1000; // Increased to 1000m to match ER Dashboard geofence circle
+    const route = generateRoute(hospitalLocation, destination, 6);
+    const geofenceRadius = 1000;
     let geofenceBreached = false;
 
     for (let i = 0; i < route.length; i++) {
@@ -705,14 +706,10 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
         const stepTime = new Date(checkoutTime.getTime() + i * 1 * 60000);
         setArtificialTime(stepTime);
         
-        // Log API Interaction
-        const locReq = { device: { phoneNumber } };
-        const locRes = await locationRetrieval(phoneNumber, currentLocation);
-        if (logApi) logApi('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', locReq, locRes);
-
-        setLocation(locRes);
         setUserGps(currentLocation);
-        addMessage(`Patient location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`);
+        
+        const distance = getDistanceFromLatLonInMeters(hospitalLocation.lat, hospitalLocation.lng, currentLocation.lat, currentLocation.lng);
+        addMessage(`Patient location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)} | Distance: ${Math.round(distance)}m`);
 
         // Broadcast location update to ER Dashboard with patient name
         if (broadcast) {
@@ -723,12 +720,10 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
             });
         }
 
-        // Check Geofence - only change status after step 2 (patient has moved significantly away)
-        const distance = getDistanceFromLatLonInMeters(hospitalLocation.lat, hospitalLocation.lng, currentLocation.lat, currentLocation.lng);
-        
-        if (!geofenceBreached && distance > geofenceRadius && i >= 2) {
+        // Check Geofence - change status ONLY when patient is outside geofence
+        if (!geofenceBreached && distance > geofenceRadius) {
             geofenceBreached = true;
-            addMessage(`Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`);
+            addMessage(`Alert! Patient ${guestName} has breached geofence (${Math.round(distance)}m from hospital). Contact at ${phoneNumber}`);
             setPatientMedicalDetails({ patientId: '', alert: `Alert! Patient ${guestName} has left the premises. Contact at ${phoneNumber}`, esi: '', vitals: '', complaint: '', eta: '', medicalHistory: '', treatmentNeeds: { specialists: [], equipment: [] } });
             
             // Broadcast LEFT_AMA status to ER Dashboard with patient name
@@ -1014,7 +1009,10 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
         setLocation(locRes);
         
         if (locRes.area && locRes.area.center) {
-            const currentLoc = { lat: locRes.area.center.latitude, lng: locRes.area.center.longitude };
+            const currentLoc = { 
+                lat: locRes.area.center.latitude,
+                lng: locRes.area.center.longitude
+            };
             setUserGps(currentLoc);
             addMessage(`Location: ${currentLoc.lat.toFixed(4)}, ${currentLoc.lng.toFixed(4)}`);
         }

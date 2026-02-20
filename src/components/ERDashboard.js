@@ -6,8 +6,8 @@ import ambulanceIcon from '../ambulance.png';
 import patientIcon from '../patient.png';
 import emergencyRoomBg from '../emergency.png';
 
-const HOSPITAL_LOCATION = { lat: 41.400, lng: 2.100 }; // Barcelona - Hospital Clínic area
-const MAP_CENTER = { lat: 41.3850, lng: 2.050 }; // Shifted west to show incoming ambulances
+const HOSPITAL_LOCATION = { lat: 41.38697, lng: 2.1182 }; // Barcelona - Les Corts residential area
+const MAP_CENTER = { lat: 41.38697, lng: 2.1182 };
 
 const mockAdditionalPatients = [
   {
@@ -596,7 +596,7 @@ const ERDashboard = () => {
                 <div className="er-sidebar">
                   <div className="map-panel">
                     <h3>Live Patient Tracking</h3>
-                    <div ref={mapRef} style={{ height: window.innerWidth >= 1400 ? '300px' : '250px', width: '100%', borderRadius: '4px' }}></div>
+                    <div ref={mapRef} style={{ height: 'clamp(200px, 25vh, 350px)', width: '100%', borderRadius: '4px' }}></div>
                   </div>
 
                   <div className="resource-panel">
@@ -651,7 +651,7 @@ const ERDashboard = () => {
                 right: '15px',
                 background: 'none',
                 border: 'none',
-                fontSize: window.innerWidth >= 1400 ? '1.2rem' : '1rem',
+                fontSize: 'clamp(1rem, 1.5vw, 1.5rem)',
                 cursor: 'pointer',
                 color: '#666',
                 fontWeight: 'bold'
@@ -660,53 +660,53 @@ const ERDashboard = () => {
               ×
             </button>
             
-            <h2 style={{ marginTop: 0, color: '#000', fontSize: window.innerWidth >= 1400 ? '1rem' : '0.8rem', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{selectedPatient.name} ({selectedPatient.age})</h2>
+            <h2 style={{ marginTop: 0, color: '#000', fontSize: 'clamp(0.8rem, 1.3vw, 1.3rem)', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>{selectedPatient.name} ({selectedPatient.age})</h2>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
                   <div>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>ESI Level:</strong>
-                    <p style={{ backgroundColor: '#ffe6e6', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getESIColor(selectedPatient.esi || 3) }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>ESI Level:</strong>
+                    <p style={{ backgroundColor: '#ffe6e6', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: getESIColor(selectedPatient.esi || 3) }}>
                       ESI-{selectedPatient.esi || 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Status:</strong>
-                    <p style={{ backgroundColor: '#e3f2fd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: getStatusBadge(selectedPatient.status || 'UNKNOWN') }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Status:</strong>
+                    <p style={{ backgroundColor: '#e3f2fd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: getStatusBadge(selectedPatient.status || 'UNKNOWN') }}>
                       {selectedPatient.status || 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>ETA:</strong>
-                    <p style={{ backgroundColor: '#fff3e0', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>ETA:</strong>
+                    <p style={{ backgroundColor: '#fff3e0', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                       {selectedPatient.eta || 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Distance:</strong>
-                    <p style={{ backgroundColor: '#f3e5f5', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Distance:</strong>
+                    <p style={{ backgroundColor: '#f3e5f5', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                       {selectedPatient.distance || 'N/A'}
                     </p>
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold', display: 'block' }}>Transport:</strong>
-                    <p style={{ backgroundColor: '#e8f5e9', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Transport:</strong>
+                    <p style={{ backgroundColor: '#e8f5e9', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                       {selectedPatient.transport || 'N/A'}
                     </p>
                   </div>
                 </div>
                 
                 <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
-                  <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                  <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
+                  <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                     {selectedPatient.complaint || 'N/A'}
                   </p>
                 </div>
                 
                 <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
-                  <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                  <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
+                  <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                     {selectedPatient.vitals || 'N/A'}
                   </p>
                 </div>
@@ -715,8 +715,8 @@ const ERDashboard = () => {
               <div style={{ flex: 1 }}>
                 {selectedPatient.medicalHistory && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
-                    <p style={{ backgroundColor: '#fff3cd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
+                    <p style={{ backgroundColor: '#fff3cd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                       {selectedPatient.medicalHistory}
                     </p>
                   </div>
@@ -724,8 +724,8 @@ const ERDashboard = () => {
                 
                 {selectedPatient.specialistsNeeded && selectedPatient.specialistsNeeded.length > 0 && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Specialists Required:</strong>
-                    <p style={{ backgroundColor: '#e1f5fe', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold' }}>Specialists Required:</strong>
+                    <p style={{ backgroundColor: '#e1f5fe', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                       {selectedPatient.specialistsNeeded.join(', ')}
                     </p>
                   </div>
@@ -733,8 +733,8 @@ const ERDashboard = () => {
                 
                 {selectedPatient.equipmentNeeded && selectedPatient.equipmentNeeded.length > 0 && (
                   <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', color: '#000', fontWeight: 'bold' }}>Equipments Required:</strong>
-                    <p style={{ backgroundColor: '#fce4ec', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', fontWeight: 'normal', color: '#000' }}>
+                    <strong style={{ fontSize: 'clamp(0.6rem, 1vw, 1rem)', color: '#000', fontWeight: 'bold' }}>Equipments Required:</strong>
+                    <p style={{ backgroundColor: '#fce4ec', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.6rem, 1vw, 1rem)', fontWeight: 'normal', color: '#000' }}>
                       {selectedPatient.equipmentNeeded.join(', ')}
                     </p>
                   </div>
@@ -758,7 +758,7 @@ const ERDashboard = () => {
                     }}>
                       <span style={{ fontSize: '0.9rem' }}>🤖</span>
                       <strong style={{ 
-                        fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem', 
+                        fontSize: 'clamp(0.6rem, 1vw, 1rem)', 
                         fontWeight: 'bold',
                         color: '#ffd700',
                         textShadow: '0 0 10px rgba(255, 215, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)',
@@ -773,13 +773,13 @@ const ERDashboard = () => {
                     }}>
                       <div style={{ marginBottom: '0.2rem' }}>
                         <strong style={{ 
-                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem',
+                          fontSize: 'clamp(0.6rem, 1vw, 1rem)',
                           color: '#fff',
                           textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
                         }}>Diagnosis:</strong>
                         <p style={{ 
                           margin: '0.05rem 0 0 0', 
-                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', 
+                          fontSize: 'clamp(0.55rem, 0.9vw, 0.9rem)', 
                           fontWeight: 'normal', 
                           color: '#fff',
                           textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
@@ -789,13 +789,13 @@ const ERDashboard = () => {
                       </div>
                       <div>
                         <strong style={{ 
-                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.55rem',
+                          fontSize: 'clamp(0.6rem, 1vw, 1rem)',
                           color: '#fff',
                           textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
                         }}>Recommended Action:</strong>
                         <p style={{ 
                           margin: '0.05rem 0 0 0', 
-                          fontSize: window.innerWidth >= 1400 ? '0.75rem' : '0.5rem', 
+                          fontSize: 'clamp(0.55rem, 0.9vw, 0.9rem)', 
                           fontWeight: 'normal', 
                           color: '#fff',
                           textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'

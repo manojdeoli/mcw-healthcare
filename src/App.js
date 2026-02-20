@@ -49,13 +49,12 @@ const generateRoute = (start, end, sections = 10) => {
   const latDiff = (end.lat - start.lat) / sections;
   const lngDiff = (end.lng - start.lng) / sections;
 
-  for (let i = 1; i < sections; i++) {
+  for (let i = 1; i <= sections; i++) {
     route.push({
       lat: start.lat + latDiff * i,
       lng: start.lng + lngDiff * i,
     });
   }
-  route.push(end);
   return route;
 };
 
@@ -81,6 +80,7 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
   const mapUpdateThrottle = useRef(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [liveUserGps, setLiveUserGps] = useState(userGps);
+  const [showGeofence, setShowGeofence] = useState(false);
 
   // Listen to location updates from broadcasts
   useEffect(() => {
@@ -90,6 +90,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
       if (type === 'SET_USER_GPS') {
         console.log('Admin Console Map received SET_USER_GPS:', data);
         setLiveUserGps(data);
+      } else if (type === 'SHOW_GEOFENCE_CIRCLE') {
+        setShowGeofence(true);
       }
     };
     return () => channel.close();
@@ -104,8 +106,8 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
     if (mapRef.current && !mapInstanceRef.current) {
       if (mapRef.current._leaflet_id) mapRef.current._leaflet_id = null;
       // Use hospitalLocation if available, otherwise default to Barcelona west
-      const initialLat = hospitalLocation?.lat || 41.3874;
-      const initialLng = hospitalLocation?.lng || 2.1686;
+      const initialLat = hospitalLocation?.lat || 41.38697;
+      const initialLng = hospitalLocation?.lng || 2.1182;
       const map = L.map(mapRef.current).setView([initialLat, initialLng], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -206,8 +208,17 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           color: 'red',
           fillColor: '#ff0000',
           fillOpacity: 0.2,
-          radius: 100
-        }).addTo(mapInstance).bindPopup('Hospital Check-in Area');
+          radius: 50
+        }).addTo(mapInstance).bindPopup('Hospital Area');
+        
+        if (showGeofence) {
+          L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
+            color: '#0099ff',
+            fillColor: '#0099ff',
+            fillOpacity: 0.1,
+            radius: 1000
+          }).addTo(mapInstance).bindPopup('Geofencing Area (1km)');
+        }
       }
 
       if (currentLiveUserGps && verifiedPhoneNumber) {
@@ -247,11 +258,11 @@ const ApiLogsView = ({ apiLogs, onClear, maxHeight }) => (
             <div style={{ flex: 1, padding: '10px', borderRight: '1px solid #eee', background: '#fff' }}>
               <strong>Request:</strong>
               <div style={{ color: '#0056b3', marginBottom: '5px' }}>{log.method} {log.url}</div>
-              <pre style={{ background: '#f8f9fa', padding: '5px', borderRadius: '3px', overflowX: 'auto' }}>{JSON.stringify(log.request, null, 2)}</pre>
+              <pre style={{ background: '#f8f9fa', padding: '5px', borderRadius: '3px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxWidth: '100%', margin: 0 }}>{JSON.stringify(log.request, null, 2)}</pre>
             </div>
             <div style={{ flex: 1, padding: '10px', background: '#fff' }}>
               <strong>Response:</strong>
-              <pre style={{ background: '#f8f9fa', padding: '5px', borderRadius: '3px', overflowX: 'auto' }}>{JSON.stringify(log.response, null, 2)}</pre>
+              <pre style={{ background: '#f8f9fa', padding: '5px', borderRadius: '3px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxWidth: '100%', margin: 0 }}>{JSON.stringify(log.response, null, 2)}</pre>
             </div>
           </div>
         </div>
@@ -286,7 +297,7 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState('Not Paid');
   const [geofencingSubscriptionId, setGeofencingSubscriptionId] = useState(null);
   const [outpatientStatus, setOutpatientStatus] = useState('Inactive');
-  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.400, lng: 2.100 });
+  const [hospitalLocation, setHospitalLocation] = useState({ lat: 41.38697, lng: 2.1182 });
   const [userGps, setUserGps] = useState(null);
   const [initialUserLocation, setInitialUserLocation] = useState(null);
   const [lastIntegrityCheckTime, setLastIntegrityCheckTime] = useState(null);
@@ -1039,9 +1050,9 @@ function App() {
           lng: patientLocationData.area.center.longitude
         };
         
-        // Hospital location is fixed in Barcelona - Hospital Clínic area
-        const fixedHospitalCoords = { lat: 41.400, lng: 2.100 };
-        syncSetHospitalLocation(fixedHospitalCoords);
+        // Hospital location is fixed in Barcelona - Les Corts residential area
+        const fixedHospitalCoords = { lat: 41.38697, lng: 2.1182 };
+        setHospitalLocation(fixedHospitalCoords);
 
         // Use actual patient location from API as starting point (coming from North-East)
         const initialUserCoords = actualPatientCoords;
@@ -1104,7 +1115,7 @@ function App() {
         const guestName = formState.name ? `${formState.name}` : 'Patient';
         await api.startPatientAbscondmentSequence(
           phone,
-          initialUserLocation,
+          hospitalLocation,
           hospitalLocation,
           addMessage,
           syncSetLocation,
@@ -1590,7 +1601,7 @@ function App() {
                 <div style={{ flex: 1, minWidth: '300px' }}>
               {/* Phone Verification */}
               <div id="verification-container" className="card">
-                <h2 className="card-header">1. Phone Verification</h2>
+                <h2 className="card-header">1. Number Verification</h2>
                 <div className="p-3">
                   <form onSubmit={validatePhone}>
                     <div className="verify-form-container">
@@ -1722,7 +1733,7 @@ function App() {
               <div className="dashboard-column" style={{ flex: 1, minWidth: 0 }}>
                 {/* Phone Verification */}
                 <div id="verification-container" className="card">
-                  <h2 className="card-header">1. Phone Verification</h2>
+                  <h2 className="card-header">1. Number Verification</h2>
                   <div className="p-3">
                     
                     <form onSubmit={validatePhone}>
