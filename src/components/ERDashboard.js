@@ -466,9 +466,8 @@ const ERDashboard = () => {
                                       console.log('Check-in clicked for:', sortedPatients[0].name);
                                       handleCheckIn(sortedPatients[0]);
                                     }}
-                                    style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                   >
-                                    Check-In ✓
+                                    ✓ Check-In Patient
                                   </button>
                                 )}
                               </h3>
@@ -526,9 +525,8 @@ const ERDashboard = () => {
                                         console.log('Check-in clicked for:', sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name);
                                         handleCheckIn(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex]);
                                       }}
-                                      style={{ fontSize: '0.5em', padding: '1px 4px', borderRadius: '2px', border: '1px solid #28a745', background: '#28a745', color: 'white', lineHeight: '1.2', cursor: 'pointer' }}
                                     >
-                                      Check-In ✓
+                                      ✓ Check-In Patient
                                     </button>
                                   )}
                                 </h3>
