@@ -216,12 +216,24 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         // Check if patient has arrived (within 100m)
         const patientArrived = currentLiveUserGps && getDistance(currentLiveUserGps, currentHospitalLocation) <= 100;
         
+        // Always show red 50m circle
         L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
           color: 'red',
           fillColor: '#ff0000',
           fillOpacity: 0.2,
-          radius: patientArrived ? 100 : 50
-        }).addTo(mapInstance).bindPopup(patientArrived ? 'Patient Arrival Zone (100m)' : 'Hospital Area');
+          radius: 50
+        }).addTo(mapInstance).bindPopup('Hospital Area');
+        
+        // Show green 100m circle when patient arrives
+        if (patientArrived) {
+          L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
+            color: '#00ff00',
+            fillColor: '#00ff00',
+            fillOpacity: 0.15,
+            radius: 100,
+            weight: 3
+          }).addTo(mapInstance).bindPopup('Patient Arrival Zone (100m)');
+        }
         
         if (showGeofence) {
           L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
