@@ -175,19 +175,28 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
           const ZOOM_START_RADIUS = 10000;
           const MIN_ZOOM = 12;
           const MAX_ZOOM = 14;
+          const ARRIVAL_THRESHOLD = 100; // 100 meters
 
           let newZoom;
-          if (distance >= ZOOM_START_RADIUS) {
+          let centerLat, centerLng;
+          
+          // If patient has arrived (within 100m), center on hospital with fixed zoom
+          if (distance <= ARRIVAL_THRESHOLD) {
+            newZoom = 13;
+            centerLat = currentHospitalLocation.lat;
+            centerLng = currentHospitalLocation.lng;
+          } else if (distance >= ZOOM_START_RADIUS) {
             newZoom = MIN_ZOOM;
+            centerLat = (currentLiveUserGps.lat + currentHospitalLocation.lat) / 2;
+            centerLng = (currentLiveUserGps.lng + currentHospitalLocation.lng) / 2;
           } else {
             const zoomProgress = 1 - (distance / ZOOM_START_RADIUS);
             newZoom = MIN_ZOOM + (MAX_ZOOM - MIN_ZOOM) * zoomProgress;
+            centerLat = (currentLiveUserGps.lat + currentHospitalLocation.lat) / 2;
+            centerLng = (currentLiveUserGps.lng + currentHospitalLocation.lng) / 2;
           }
 
-          const midLat = (currentLiveUserGps.lat + currentHospitalLocation.lat) / 2;
-          const midLng = (currentLiveUserGps.lng + currentHospitalLocation.lng) / 2;
-
-          mapInstance.setView([midLat, midLng], newZoom, { animate: true, pan: { duration: 2.5 } });
+          mapInstance.setView([centerLat, centerLng], newZoom, { animate: true, pan: { duration: 2.5 } });
         }
         if (verifiedPhoneNumber) {
           updateMapView();
