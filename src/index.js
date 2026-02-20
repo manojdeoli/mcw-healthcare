@@ -4,16 +4,19 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
 import App from './App';
 import ERDashboardPage from './ERDashboardPage';
+import AttractMode from './components/AttractMode';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
-// Check if we're on the ER Dashboard route
-const isERDashboard = window.location.hash === '#/er-dashboard';
+// Check route
+const hash = window.location.hash;
+const isERDashboard = hash === '#/er-dashboard';
+const isAttractMode = hash === '#/attract-mode';
 
 root.render(
   <React.StrictMode>
-    {isERDashboard ? <ERDashboardPage /> : <App />}
+    {isAttractMode ? <AttractMode /> : isERDashboard ? <ERDashboardPage /> : <App />}
   </React.StrictMode>
 );
 
