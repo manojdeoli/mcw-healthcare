@@ -54,11 +54,11 @@
 
 .monitor-screen {
   position: absolute;
-  top: 5vh;
+  top: 8vh;
   left: 50%;
   transform: translateX(-50%) perspective(1000px) rotateX(-12deg);
   width: clamp(400px, 50vw, 1000px);
-  height: clamp(300px, 42vh, 750px);
+  height: clamp(300px, 38vh, 750px);
   background: rgba(255, 255, 255, 0.85);
   border-radius: 8px;
   overflow: visible;
@@ -704,8 +704,8 @@
 @media (min-width: 1400px) {
   .monitor-screen {
     width: 55vw;
-    height: 54vh;
-    top: 0%;
+    height: 38vh;
+    top: 8vh;
     left: 50%;
     right: auto;
     transform: translateX(-50%) perspective(1000px) rotateX(-12deg);
@@ -833,8 +833,8 @@
 @media (min-width: 1920px) and (max-width: 1920px) {
   .monitor-screen {
     width: 60vw;
-    height: 59vh;
-    top: 0%;
+    height: 38vh;
+    top: 8vh;
   }
 
   .er-header h1 {
