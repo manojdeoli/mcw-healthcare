@@ -213,12 +213,15 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
         });
         L.marker([currentHospitalLocation.lat, currentHospitalLocation.lng], { icon: hospitalIcon }).addTo(mapInstance).bindPopup('Hospital Location');
 
+        // Check if patient has arrived (within 100m)
+        const patientArrived = currentLiveUserGps && getDistance(currentLiveUserGps, currentHospitalLocation) <= 100;
+        
         L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
           color: 'red',
           fillColor: '#ff0000',
           fillOpacity: 0.2,
-          radius: 50
-        }).addTo(mapInstance).bindPopup('Hospital Area');
+          radius: patientArrived ? 100 : 50
+        }).addTo(mapInstance).bindPopup(patientArrived ? 'Patient Arrival Zone (100m)' : 'Hospital Area');
         
         if (showGeofence) {
           L.circle([currentHospitalLocation.lat, currentHospitalLocation.lng], {
