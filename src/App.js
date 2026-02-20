@@ -172,9 +172,9 @@ const LocationMap = ({ userGps, hospitalLocation, verifiedPhoneNumber, simulatio
             return;
           }
           const distance = getDistance(currentLiveUserGps, currentHospitalLocation);
-          const ZOOM_START_RADIUS = 5000;
+          const ZOOM_START_RADIUS = 10000;
           const MIN_ZOOM = 12;
-          const MAX_ZOOM = 16;
+          const MAX_ZOOM = 14;
 
           let newZoom;
           if (distance >= ZOOM_START_RADIUS) {
