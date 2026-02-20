@@ -136,7 +136,7 @@
 
 .er-header h1 {
   margin: 0;
-  font-size: clamp(0.6rem, 1.2vw, 1.2rem);
+  font-size: clamp(0.45rem, 0.85vw, 0.85rem);
   color: #00ff88;
   font-weight: 900;
   text-shadow: 0 0 8px #00ff88, 0 0 15px #00ff88;

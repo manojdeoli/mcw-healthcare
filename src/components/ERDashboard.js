@@ -455,7 +455,7 @@ const ERDashboard = () => {
                             <div className="patient-info">
                               <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
                                 <span>{sortedPatients[0].name} ({sortedPatients[0].age})</span>
-                                {sortedPatients[0].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[0].id}</span>}
+                                {sortedPatients[0].id && <span style={{ fontSize: '0.7em', color: '#333', fontWeight: 'bold' }}>| ID: {sortedPatients[0].id}</span>}
                                 {/* Check-in button only when patient arrives at hospital */}
                                 {!sortedPatients[0].phoneNumber.startsWith('mock-') && 
                                  sortedPatients[0].status === 'ARRIVED' && (
@@ -514,7 +514,7 @@ const ERDashboard = () => {
                               <div className="patient-info">
                                 <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
                                   <span>{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name} ({sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].age})</span>
-                                  {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#666' }}>| ID: {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id}</span>}
+                                  {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#333', fontWeight: 'bold' }}>| ID: {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id}</span>}
                                   {/* Check-in button only when patient arrives at hospital */}
                                   {!sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].phoneNumber.startsWith('mock-') && 
                                    sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].status === 'ARRIVED' && (
