@@ -58,7 +58,7 @@
   left: 50%;
   transform: translateX(-50%) perspective(1000px) rotateX(-12deg);
   width: clamp(400px, 50vw, 1000px);
-  height: clamp(300px, 45vh, 700px);
+  height: clamp(300px, 50vh, 750px);
   background: rgba(255, 255, 255, 0.85);
   border-radius: 8px;
   overflow: visible;
@@ -186,6 +186,7 @@
   grid-template-columns: 1.2fr 1fr;
   gap: 0.3rem;
   height: calc(100% - 30px);
+  overflow: hidden;
 }
 
 .patient-queue {
@@ -476,15 +477,17 @@
   flex-direction: column;
   gap: 0.5rem;
   margin-left: 0.5rem;
+  overflow-y: auto;
+  max-height: 100%;
 }
 
 .map-panel, .resource-panel {
   background: linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.9) 100%);
-  padding: 0.1rem;
+  padding: 0.3rem;
   border-radius: 3px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  margin-bottom: 0.05rem;
+  margin-bottom: 0.2rem;
 }
 
 .map-panel h3, .resource-panel h3 {
