@@ -213,7 +213,7 @@
   color: #1a1a1a;
   border-bottom: 1px solid #666;
   padding-bottom: 0.1rem;
-  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
+  font-size: clamp(0.5rem, 0.9vw, 0.9rem);
   font-weight: bold;
 }
 
@@ -266,12 +266,12 @@
   border-radius: 2px;
   border-left: 3px solid #333;
   font-size: clamp(0.35rem, 0.6vw, 0.6rem);
-  font-weight: 900;
+  font-weight: 500;
   border: 1px solid #ddd;
 }
 
 .resource-value {
-  font-weight: 900;
+  font-weight: 600;
   font-size: clamp(0.4rem, 0.65vw, 0.65rem);
   color: #000 !important;
 }
