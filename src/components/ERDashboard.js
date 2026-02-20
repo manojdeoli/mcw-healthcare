@@ -596,7 +596,7 @@ const ERDashboard = () => {
                 <div className="er-sidebar">
                   <div className="map-panel">
                     <h3>Live Patient Tracking</h3>
-                    <div ref={mapRef} style={{ height: '200px', width: '100%', borderRadius: '4px' }}></div>
+                    <div ref={mapRef} style={{ height: '150px', width: '100%', borderRadius: '4px' }}></div>
                   </div>
 
                   <div className="resource-panel">

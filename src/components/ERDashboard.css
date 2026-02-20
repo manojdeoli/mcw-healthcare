@@ -58,7 +58,7 @@
   left: 50%;
   transform: translateX(-50%) perspective(1000px) rotateX(-12deg);
   width: clamp(400px, 50vw, 1000px);
-  height: clamp(300px, 50vh, 750px);
+  height: clamp(300px, 45vh, 750px);
   background: rgba(255, 255, 255, 0.85);
   border-radius: 8px;
   overflow: visible;
