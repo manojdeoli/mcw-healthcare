@@ -507,6 +507,7 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
         eta: 'Calculating...',
         medicalHistory: '',
         treatmentNeeds: { specialists: [], equipment: [] },
+        aiSummary: null,
     });
 
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -598,8 +599,16 @@ export async function startMedicalTransportSequence(phoneNumber, initialUserLoca
             newVitals = '♥ HR: 105 bpm | 🩸 BP: 145/100 mmHg | 🫁 O₂: 97% | 🌡 T: 36.9°C';
             
             // Generate AI summary when patient is about to reach (10 min ETA)
-            if (broadcast && patientData && patientData.chiefComplaint) {
-                const aiSummary = generateAISummary(patientData.chiefComplaint);
+            const aiSummary = generateAISummary(patientData.chiefComplaint || patientData.complaint);
+            
+            // Update Admin Console with AI summary
+            setPatientMedicalDetails(prev => ({
+                ...prev,
+                aiSummary
+            }));
+            
+            // Broadcast to ER Dashboard
+            if (broadcast && patientData) {
                 broadcast('PATIENT_STATUS_UPDATE', {
                     phoneNumber: patientData.phoneNumber,
                     aiSummary

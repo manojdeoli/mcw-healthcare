@@ -333,6 +333,7 @@ function App() {
     eta: '',
     medicalHistory: '',
     treatmentNeeds: { specialists: [], equipment: [] },
+    aiSummary: null,
   });
 
   const [messages, setMessages] = useState([]);
@@ -738,6 +739,35 @@ function App() {
       return;
     }
     
+    // Remove previous real patient from ER Dashboard when starting new registration
+    if (phone && !phone.startsWith('mock-')) {
+      broadcast('REMOVE_PATIENT', { phoneNumber: phone });
+    }
+    
+    // Reset all application state before starting registration
+    syncSetRegistrationStatus('Not Registered');
+    syncSetIdentityIntegrity('Bad');
+    syncSetPatientStatus('Not Checked In');
+    syncSetPaymentStatus('Not Paid');
+    syncSetGeofencingSubscriptionId(null);
+    syncSetOutpatientStatus('Inactive');
+    syncSetUserGps(null);
+    syncSetInitialUserLocation(null);
+    syncSetLastIntegrityCheckTime(null);
+    syncSetPatientMedicalDetails({
+      patientId: '',
+      esi: '',
+      vitals: '',
+      complaint: '',
+      eta: '',
+      medicalHistory: '',
+      treatmentNeeds: { specialists: [], equipment: [] },
+      aiSummary: null,
+    });
+    syncSetAdditionalPatients([]);
+    syncSetKycMatchResponse(null);
+    syncSetArtificialTime(null);
+    
     addMessage("Fetching patient details with KYC Fill...");
     const patientKycData = await api.kycFill(phone);
     logApiInteraction('KYC Fill', 'POST', '/kyc-fill-in/kyc-fill-in/v0.4/fill-in', { phoneNumber: phone }, patientKycData);
@@ -849,6 +879,12 @@ function App() {
     const isMonitoringResume = sessionStorage.getItem('monitoring_triggered');
     
     if (!isMonitoringResume) {
+      // Remove previous real patient from ER Dashboard
+      const prevPhone = getVerifiedNumber();
+      if (prevPhone && !prevPhone.startsWith('mock-')) {
+        broadcast('REMOVE_PATIENT', { phoneNumber: prevPhone });
+      }
+      
       // Clear session storage and localStorage when starting new verification
       sessionStorage.clear();
       localStorage.removeItem('outpatientStatus');
@@ -871,6 +907,7 @@ function App() {
         eta: '',
         medicalHistory: '',
         treatmentNeeds: { specialists: [], equipment: [] },
+        aiSummary: null,
       });
       syncSetAdditionalPatients([]);
       syncSetKycMatchResponse(null);
@@ -1708,6 +1745,32 @@ function App() {
                       {patientMedicalDetails.medicalHistory && <li><strong>Medical History:</strong> <span>{patientMedicalDetails.medicalHistory}</span></li>}
                       {patientMedicalDetails.treatmentNeeds.specialists.length > 0 && <li><strong>Specialists Required:</strong> <span>{patientMedicalDetails.treatmentNeeds.specialists.join(', ')}</span></li>}
                       {patientMedicalDetails.treatmentNeeds.equipment.length > 0 && <li><strong>Equipment Needed:</strong> <span>{patientMedicalDetails.treatmentNeeds.equipment.join(', ')}</span></li>}
+                      {patientMedicalDetails.aiSummary && (
+                        <li style={{ padding: 0, border: 'none', marginTop: '8px' }}>
+                          <div style={{ 
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                            padding: '10px', 
+                            borderRadius: '5px',
+                            border: '2px solid #ffd700',
+                            boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                              <span style={{ fontSize: '1.2em' }}>🤖</span>
+                              <strong style={{ color: '#ffd700', textShadow: '0 0 10px rgba(255, 215, 0, 0.5)', fontSize: '1em', letterSpacing: '0.5px' }}>AI ANALYSIS</strong>
+                            </div>
+                            <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '8px', borderRadius: '4px' }}>
+                              <div style={{ marginBottom: '8px' }}>
+                                <strong style={{ color: '#fff', fontSize: '0.9em' }}>Diagnosis:</strong>
+                                <p style={{ margin: '4px 0 0 0', color: '#fff', fontSize: '0.85em' }}>{patientMedicalDetails.aiSummary.diagnosis}</p>
+                              </div>
+                              <div>
+                                <strong style={{ color: '#fff', fontSize: '0.9em' }}>Recommended Action:</strong>
+                                <p style={{ margin: '4px 0 0 0', color: '#fff', fontSize: '0.85em' }}>{patientMedicalDetails.aiSummary.recommendedAction}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      )}
                     </ul>
                   </div>
 
@@ -1839,6 +1902,32 @@ function App() {
                     {patientMedicalDetails.medicalHistory && <li><strong>Medical History:</strong> <span>{patientMedicalDetails.medicalHistory}</span></li>}
                     {patientMedicalDetails.treatmentNeeds.specialists.length > 0 && <li><strong>Specialists Required:</strong> <span>{patientMedicalDetails.treatmentNeeds.specialists.join(', ')}</span></li>}
                     {patientMedicalDetails.treatmentNeeds.equipment.length > 0 && <li><strong>Equipment Needed:</strong> <span>{patientMedicalDetails.treatmentNeeds.equipment.join(', ')}</span></li>}
+                    {patientMedicalDetails.aiSummary && (
+                      <li style={{ padding: 0, border: 'none', marginTop: '8px' }}>
+                        <div style={{ 
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                          padding: '10px', 
+                          borderRadius: '5px',
+                          border: '2px solid #ffd700',
+                          boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                            <span style={{ fontSize: '1.2em' }}>🤖</span>
+                            <strong style={{ color: '#ffd700', textShadow: '0 0 10px rgba(255, 215, 0, 0.5)', fontSize: '1em', letterSpacing: '0.5px' }}>AI ANALYSIS</strong>
+                          </div>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '8px', borderRadius: '4px' }}>
+                            <div style={{ marginBottom: '8px' }}>
+                              <strong style={{ color: '#fff', fontSize: '0.9em' }}>Diagnosis:</strong>
+                              <p style={{ margin: '4px 0 0 0', color: '#fff', fontSize: '0.85em' }}>{patientMedicalDetails.aiSummary.diagnosis}</p>
+                            </div>
+                            <div>
+                              <strong style={{ color: '#fff', fontSize: '0.9em' }}>Recommended Action:</strong>
+                              <p style={{ margin: '4px 0 0 0', color: '#fff', fontSize: '0.85em' }}>{patientMedicalDetails.aiSummary.recommendedAction}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    )}
                   </ul>
                 </div>
 
