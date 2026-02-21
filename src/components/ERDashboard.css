@@ -136,7 +136,7 @@
 
 .er-header h1 {
   margin: 0;
-  font-size: clamp(0.45rem, 0.85vw, 0.85rem);
+  font-size: clamp(0.4rem, 0.7vw, 0.7rem);
   color: #00ff88;
   font-weight: 900;
   text-shadow: 0 0 8px #00ff88, 0 0 15px #00ff88;
@@ -164,7 +164,7 @@
 }
 
 .stat-label {
-  font-size: clamp(0.4rem, 0.7vw, 0.7rem);
+  font-size: clamp(0.35rem, 0.6vw, 0.6rem);
   color: #00d4ff;
   font-weight: 700;
   font-family: 'Courier New', monospace;
@@ -176,7 +176,7 @@
 }
 
 .stat-value {
-  font-size: clamp(0.5rem, 0.9vw, 0.9rem);
+  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
   font-weight: 900;
   color: #00ff88;
   font-family: 'Courier New', monospace;
@@ -218,7 +218,7 @@
   color: #1a1a1a;
   border-bottom: 1px solid #666;
   padding-bottom: 0.1rem;
-  font-size: clamp(0.5rem, 0.9vw, 0.9rem);
+  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
   font-weight: bold;
 }
 
@@ -228,7 +228,7 @@
   color: #1a1a1a;
   border-bottom: 1px solid #666;
   padding-bottom: 0.1rem;
-  font-size: clamp(0.5rem, 0.9vw, 0.9rem);
+  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
   font-weight: bold;
 }
 
@@ -304,7 +304,7 @@
   display: block;
   margin-bottom: 0.1rem;
   color: #000;
-  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
+  font-size: clamp(0.4rem, 0.65vw, 0.65rem);
   font-weight: 900;
   letter-spacing: 0.5px;
   text-shadow: 0 0 3px #fff, 0 0 5px #fff;
@@ -313,7 +313,7 @@
 .alert-item p {
   margin: 0.1rem 0;
   color: #000;
-  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
+  font-size: clamp(0.4rem, 0.65vw, 0.65rem);
   font-weight: 900;
   letter-spacing: 0.5px;
   text-shadow: 0 0 3px #fff, 0 0 5px #fff;
@@ -343,7 +343,7 @@
 
 .patient-info h3 {
   margin: 0;
-  font-size: clamp(0.7rem, 1.1vw, 1.1rem);
+  font-size: clamp(0.6rem, 0.9vw, 0.9rem);
   font-weight: 1000;
   color: #000;
   letter-spacing: 0.5px;
@@ -361,7 +361,7 @@
   padding: 0.05rem 0.15rem;
   border-radius: 2px;
   color: white;
-  font-size: clamp(0.45rem, 0.75vw, 0.75rem);
+  font-size: clamp(0.4rem, 0.65vw, 0.65rem);
   font-weight: 900;
   text-shadow: 0 0 1px rgba(0, 0, 0, 0.5);
   letter-spacing: 0.5px;
@@ -370,7 +370,7 @@
 .detail-row {
   display: flex;
   justify-content: space-between;
-  font-size: clamp(0.55rem, 0.9vw, 0.9rem);
+  font-size: clamp(0.5rem, 0.75vw, 0.75rem);
   padding: 0.15rem;
   background: rgba(255, 255, 255, 0.7);
   border-radius: 3px;
@@ -393,7 +393,7 @@
   background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%);
   padding: 0.2rem;
   border-radius: 3px;
-  font-size: clamp(0.6rem, 0.95vw, 0.95rem);
+  font-size: clamp(0.5rem, 0.8vw, 0.8rem);
   margin-top: 0.1rem;
   color: #000;
   font-weight: 1000;
@@ -682,7 +682,7 @@
   border: none;
   padding: 0.15rem 0.3rem;
   border-radius: 3px;
-  font-size: clamp(0.5rem, 0.75vw, 0.75rem);
+  font-size: clamp(0.45rem, 0.65vw, 0.65rem);
   font-weight: 900;
   cursor: pointer;
   margin-top: 0;
