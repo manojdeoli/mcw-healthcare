@@ -111,8 +111,19 @@ const ERDashboard = () => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const channelRef = useRef(null);
+  const videoRef = useRef(null);
+  const nextVideoRef = useRef(null);
 
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [activeVideoElement, setActiveVideoElement] = useState('video1');
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [showAttribution, setShowAttribution] = useState(false);
+
+  const videoFiles = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
+
+  // Only hide dashboard overlay in attract mode OR when inside iframe (for AttractMode)
+  const isInIframe = window !== window.top;
+  const isAttractMode = window.location.hash === '#/attract-mode' || isInIframe;
 
   // Sort patients: real patient (Joe Bloggs) always first, then rotate mock patients
   const realPatient = patients.find(p => !p.phoneNumber.startsWith('mock-'));
@@ -152,6 +163,64 @@ const ERDashboard = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Presentation-style video transitions
+  useEffect(() => {
+    const video1 = videoRef.current;
+    const video2 = nextVideoRef.current;
+    if (!video1 || !video2) return;
+
+    const currentVideo = activeVideoElement === 'video1' ? video1 : video2;
+    const nextVideo = activeVideoElement === 'video1' ? video2 : video1;
+    const currentVideoFile = videoFiles[currentVideoIndex];
+    
+    // Load current video if not already loaded
+    if (!currentVideo.src.includes(currentVideoFile)) {
+      currentVideo.src = `/${currentVideoFile}`;
+      currentVideo.load();
+      currentVideo.oncanplay = () => {
+        currentVideo.play().catch(error => {
+          console.log('Video play interrupted:', error.message);
+        });
+      };
+    }
+    
+    // Preload next video
+    const nextIndex = (currentVideoIndex + 1) % videoFiles.length;
+    const nextVideoFile = videoFiles[nextIndex];
+    if (!nextVideo.src.includes(nextVideoFile)) {
+      nextVideo.src = `/${nextVideoFile}`;
+      nextVideo.load();
+    }
+    
+    // Set up transition timing
+    const handleTimeUpdate = () => {
+      if (currentVideo.duration - currentVideo.currentTime <= 0.5 && !isTransitioning) {
+        setIsTransitioning(true);
+        
+        // Start next video
+        if (nextVideo.readyState >= 3) {
+          nextVideo.currentTime = 0;
+          nextVideo.play().catch(error => {
+            console.log('Video play interrupted:', error.message);
+          });
+        }
+        
+        // Switch after brief delay
+        setTimeout(() => {
+          setActiveVideoElement(prev => prev === 'video1' ? 'video2' : 'video1');
+          setCurrentVideoIndex(nextIndex);
+          setIsTransitioning(false);
+        }, 500);
+      }
+    };
+    
+    currentVideo.addEventListener('timeupdate', handleTimeUpdate);
+    
+    return () => {
+      currentVideo.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [currentVideoIndex, activeVideoElement, isTransitioning]);
 
   // Mock patient ETA updates with location movement
   useEffect(() => {
@@ -326,6 +395,17 @@ const ERDashboard = () => {
     }
   };
 
+  const getESIBackgroundColor = (esi) => {
+    switch(esi) {
+      case 1: return 'linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 50%, #80DEEA 100%)';
+      case 2: return 'linear-gradient(135deg, #E0F2F1 0%, #B2DFDB 50%, #80CBC4 100%)';
+      case 3: return 'linear-gradient(135deg, #E0F2F1 0%, #B2DFDB 50%, #80CBC4 100%)';
+      case 4: return 'linear-gradient(135deg, #FFFFFF 0%, #F8FDFF 50%, #F0F8FF 100%)';
+      case 5: return 'linear-gradient(135deg, #FFFFFF 0%, #F8FDFF 50%, #F0F8FF 100%)';
+      default: return 'linear-gradient(135deg, #FFFFFF 0%, #F8FDFF 50%, #F0F8FF 100%)';
+    }
+  };
+
   const getStatusBadge = (status) => {
     const colors = {
       'CRITICAL': '#DC3545',
@@ -348,16 +428,39 @@ const ERDashboard = () => {
 
   return (
     <div className="er-dashboard">
-      {/* Fullscreen Static Image Background */}
-      <div 
-        className="video-background"
+      {/* Dual Video System with Smooth Crossfade */}
+      <video
+        ref={videoRef}
+        muted
+        playsInline
         style={{
-          backgroundImage: 'url(/ER_Back.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          objectFit: 'cover',
+          zIndex: -1,
+          opacity: activeVideoElement === 'video1' ? 1 : 0,
+          transition: 'opacity 0.8s ease-in-out'
         }}
-      ></div>
+      />
+      <video
+        ref={nextVideoRef}
+        muted
+        playsInline
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          objectFit: 'cover',
+          zIndex: -1,
+          opacity: activeVideoElement === 'video2' ? 1 : 0,
+          transition: 'opacity 0.8s ease-in-out'
+        }}
+      />
       
       {/* Attribution Button */}
       <button
@@ -376,7 +479,7 @@ const ERDashboard = () => {
           zIndex: 10
         }}
       >
-        ℹ️ Image Attribution
+        ℹ️ Video Attribution
       </button>
 
       {/* Attribution Popup */}
@@ -412,17 +515,14 @@ const ERDashboard = () => {
           >
             ×
           </button>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Image Source:</div>
-          <div style={{ marginBottom: '10px' }}>AI-generated using OpenAI DALL·E</div>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Generation Method:</div>
-          <div style={{ marginBottom: '10px' }}>Created from a custom prompt describing a photorealistic hospital emergency room management environment designed for UI overlay demonstrations.</div>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Content Note:</div>
-          <div>The image is fully synthetic and created for internal demonstration and visualization purposes.</div>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Video Source:</div>
+          <div>Video generated by Oliver Holland using Google Gemini (Veo 3.1), 23 February 2026, using the prompt: "Create a 10 second video of a hospital Emergency Room from the stationary camera perspective of just inside the entrance door. Don't focus on any specific individuals or interactions"</div>
         </div>
       )}
       
-      {/* Monitor Content Overlay */}
-      <div className="monitor-screen">
+      {/* Dashboard - Only show if not in attract mode */}
+      {!isAttractMode && (
+        <div className="monitor-screen">
           <div className="monitor-content">
             <div className="er-content">
               <div className="er-header">
@@ -471,12 +571,12 @@ const ERDashboard = () => {
                             setSelectedPatient(sortedPatients[0]);
                             setShowDetailCard(true);
                           }}
-                          style={{ borderLeftColor: getESIColor(sortedPatients[0].esi) }}
+                          style={{ borderLeftColor: getESIColor(sortedPatients[0].esi), background: getESIBackgroundColor(sortedPatients[0].esi) }}
                         >
                           <div className="patient-header">
                             <div className="patient-info">
                               <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
-                                <span>{sortedPatients[0].name} ({sortedPatients[0].age})</span>
+                                <span style={{ color: getESIColor(sortedPatients[0].esi) }}>{sortedPatients[0].name} ({sortedPatients[0].age})</span>
                                 {sortedPatients[0].id && <span style={{ fontSize: '0.7em', color: '#333', fontWeight: 'bold' }}>| ID: {sortedPatients[0].id}</span>}
                                 {/* Check-in button only when patient arrives at hospital */}
                                 {!sortedPatients[0].phoneNumber.startsWith('mock-') && 
@@ -530,12 +630,12 @@ const ERDashboard = () => {
                               setSelectedPatient(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex]);
                               setShowDetailCard(true);
                             }}
-                            style={{ borderLeftColor: getESIColor(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi) }}
+                            style={{ borderLeftColor: getESIColor(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi), background: getESIBackgroundColor(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi) }}
                           >
                             <div className="patient-header">
                               <div className="patient-info">
                                 <h3 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
-                                  <span>{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name} ({sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].age})</span>
+                                  <span style={{ color: getESIColor(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].esi) }}>{sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name} ({sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].age})</span>
                                   {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id && <span style={{ fontSize: '0.7em', color: '#333', fontWeight: 'bold' }}>| ID: {sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].id}</span>}
                                   {/* Check-in button only when patient arrives at hospital */}
                                   {!sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].phoneNumber.startsWith('mock-') && 
@@ -852,6 +952,7 @@ const ERDashboard = () => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

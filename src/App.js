@@ -1259,6 +1259,83 @@ function App() {
     window.open(window.location.origin + '/#/er-dashboard', '_blank');
   };
 
+  const openPresentationView = () => {
+    // Broadcast that presentation mode is starting
+    const channel = new BroadcastChannel('healthcare_demo_sync_v2');
+    channel.postMessage({ type: 'PRESENTATION_MODE_STARTED' });
+    
+    const currentPort = window.location.port;
+    let presentationPort;
+    
+    // Handle different port mappings
+    if (currentPort === '3000' || currentPort === '3003') {
+      // Healthcare usecase ports
+      presentationPort = currentPort === '3000' ? '3000' : '3003';
+    } else if (currentPort === '4001' || currentPort === '4002') {
+      // Hotel case ports
+      presentationPort = currentPort === '4001' ? '4001' : '4002';
+    } else {
+      // Default fallback
+      presentationPort = currentPort || '3000';
+    }
+    
+    // Open attract-mode that switches between Healthcare and Hotel views
+    const presentationUrl = `${window.location.protocol}//${window.location.hostname}:${presentationPort}/#/attract-mode`;
+    
+    const presentationWindow = window.open(presentationUrl, '_blank', 'width=1920,height=1080');
+    if (presentationWindow) {
+      // Monitor when the presentation window is closed
+      const checkClosed = setInterval(() => {
+        if (presentationWindow.closed) {
+          clearInterval(checkClosed);
+          channel.postMessage({ type: 'PRESENTATION_MODE_ENDED' });
+          channel.close();
+        }
+      }, 1000);
+      
+      // Add fullscreen button to the new window after it loads
+      const addFullscreenButton = () => {
+        if (presentationWindow.document.readyState === 'complete') {
+          const fullscreenBtn = presentationWindow.document.createElement('button');
+          fullscreenBtn.innerHTML = '🎬 Enter Fullscreen';
+          fullscreenBtn.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 123, 255, 0.9);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+          `;
+          
+          fullscreenBtn.onclick = () => {
+            if (presentationWindow.document.documentElement.requestFullscreen) {
+              presentationWindow.document.documentElement.requestFullscreen().then(() => {
+                fullscreenBtn.style.display = 'none';
+              }).catch(console.error);
+            }
+          };
+          
+          presentationWindow.document.body.appendChild(fullscreenBtn);
+          presentationWindow.focus();
+        } else {
+          setTimeout(addFullscreenButton, 100);
+        }
+      };
+      
+      setTimeout(addFullscreenButton, 1000);
+    } else {
+      alert('Please allow popups for this site to open the presentation view');
+      channel.postMessage({ type: 'PRESENTATION_MODE_ENDED' });
+      channel.close();
+    }
+  };
+
 
 
   useEffect(() => {
@@ -1619,6 +1696,7 @@ function App() {
         <button className={`btn ${activeScreen === 2 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px', display: 'none' }} onClick={() => setActiveScreen(2)}>Hospital Dashboard</button>
         <button className={`btn ${activeScreen === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ margin: '0 5px' }} onClick={() => setActiveScreen(3)}>Admin Console</button>
         <button className="btn btn-info" style={{ margin: '0 5px' }} onClick={openERDashboard}>📊 Open ER Dashboard</button>
+        <button className="btn btn-success" style={{ margin: '0 5px' }} onClick={openPresentationView}>🎬 Open Presentation View</button>
       </nav>
 
       <main className="main-content">

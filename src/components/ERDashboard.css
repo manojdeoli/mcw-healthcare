@@ -250,9 +250,11 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.15rem;
   margin-bottom: 0.15rem;
-  padding: 0;
-  background: transparent;
-  border-radius: 3px;
+  padding: 0.1rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(240, 248, 255, 0.4) 100%);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  box-shadow: inset 0 1px 3px rgba(0, 212, 255, 0.1);
 }
 
 .resource-grid {
@@ -326,27 +328,36 @@
 }
 
 .patient-card {
-  background: linear-gradient(135deg, #FFFFFF 0%, #F0F8FF 100%);
+  background: linear-gradient(135deg, #FFFFFF 0%, #F8FDFF 50%, #F0F8FF 100%);
   color: #000;
   padding: 0.3rem;
-  border-radius: 6px;
+  border-radius: 8px;
   border-left: 5px solid #2E7D32;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
-  border: 3px solid #007bff;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 6px 20px rgba(0, 123, 255, 0.3),
+    0 3px 10px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 0 15px rgba(0, 212, 255, 0.2);
+  border: 2px solid #00d4ff;
   margin-bottom: 0.3rem;
   font-size: 0.15rem;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+  position: relative;
+  overflow: hidden;
+  animation: shine 3s ease-in-out infinite;
+  font-family: 'Lucida Sans Typewriter', 'Courier New', 'Monaco', 'Consolas', monospace;
 }
 
 .patient-info h3 {
   margin: 0;
   font-size: clamp(0.6rem, 0.9vw, 0.9rem);
-  font-weight: 1000;
+  font-weight: 900;
   color: #000;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  font-family: clamp(0.35rem, 0.6vw, 0.6rem);
 }
 
 .patient-age {
@@ -360,11 +371,12 @@
 .status-badge {
   padding: 0.05rem 0.15rem;
   border-radius: 2px;
-  color: white;
+  color: #000 !important;
   font-size: clamp(0.4rem, 0.65vw, 0.65rem);
   font-weight: 900;
-  text-shadow: 0 0 1px rgba(0, 0, 0, 0.5);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .detail-row {
@@ -372,39 +384,46 @@
   justify-content: space-between;
   font-size: clamp(0.5rem, 0.75vw, 0.75rem);
   padding: 0.15rem;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 3px;
-  border: 1px solid rgba(46, 125, 50, 0.2);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 253, 255, 0.8) 100%);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 212, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .detail-row .label {
-  color: #000;
-  font-weight: 1000;
-  letter-spacing: 0.5px;
+  color: #000 !important;
+  font-weight: 900;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .detail-row .value {
-  font-weight: 1000;
-  color: #000;
-  letter-spacing: 0.5px;
+  font-weight: 900;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .patient-complaint {
-  background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%);
+  background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 50%, #FFEB3B 100%);
   padding: 0.2rem;
-  border-radius: 3px;
+  border-radius: 4px;
   font-size: clamp(0.5rem, 0.8vw, 0.8rem);
   margin-top: 0.1rem;
   color: #000;
-  font-weight: 1000;
+  font-weight: 900;
   border-left: 3px solid #F57F17;
   border: 1px solid #FBC02D;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 6px rgba(245, 127, 23, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .patient-card:hover {
-  transform: translateX(4px) scale(1.01);
-  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+  transform: translateX(4px) scale(1.02);
+  box-shadow: 
+    0 8px 25px rgba(0, 123, 255, 0.4),
+    0 4px 15px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 25px rgba(0, 212, 255, 0.4);
+  border-color: #00ff88;
 }
 
 .patient-header {
@@ -417,22 +436,26 @@
 .patient-info h3 {
   margin: 0;
   font-size: 0.35rem;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-weight: 900;
+  color: #000;
+  font-family: clamp(0.35rem, 0.6vw, 0.6rem);
 }
 
 .patient-age {
   font-size: 0.65rem;
-  color: #555;
-  font-weight: 500;
+  color: #000;
+  font-weight: 900;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .status-badge {
   padding: 0.03rem 0.08rem;
   border-radius: 8px;
-  color: white;
+  color: #000 !important;
   font-size: 0.3rem;
-  font-weight: bold;
+  font-weight: 900;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .patient-details {
@@ -453,13 +476,14 @@
 }
 
 .detail-row .label {
-  color: #444;
-  font-weight: 500;
+  color: #000 !important;
+  font-weight: 900;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .detail-row .value {
-  font-weight: 700;
-  color: #1a1a1a;
+  font-weight: 900;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .patient-complaint {
@@ -468,10 +492,11 @@
   border-radius: 4px;
   font-size: 0.35rem;
   margin-top: 0.1rem;
-  color: #1a1a1a;
-  font-weight: 500;
+  color: #000;
+  font-weight: 900;
   border-left: 2px solid #0066cc;
   box-shadow: 0 1px 4px rgba(0, 102, 204, 0.1);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .er-sidebar {
@@ -603,6 +628,31 @@
   }
 }
 
+/* Shining animation for all patient cards */
+@keyframes shine {
+  0% {
+    box-shadow: 
+      0 6px 20px rgba(0, 123, 255, 0.3),
+      0 3px 10px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      0 0 15px rgba(0, 212, 255, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 8px 25px rgba(0, 123, 255, 0.4),
+      0 4px 15px rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 0 25px rgba(0, 212, 255, 0.4);
+  }
+  100% {
+    box-shadow: 
+      0 6px 20px rgba(0, 123, 255, 0.3),
+      0 3px 10px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      0 0 15px rgba(0, 212, 255, 0.2);
+  }
+}
+
 .patient-card.pulse-animation {
   animation: pulse 2s infinite;
   border-left-width: 4px !important;
@@ -620,8 +670,9 @@
 }
 
 .detail-row .eta {
-  color: #DC3545;
-  font-weight: bold;
+  color: #DC3545 !important;
+  font-weight: 900;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .patient-vitals {
