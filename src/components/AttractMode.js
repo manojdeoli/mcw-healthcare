@@ -4,22 +4,33 @@ import './AttractMode.css';
 const AttractMode = () => {
   const [currentView, setCurrentView] = useState(0);
   const [hotelKioskAvailable, setHotelKioskAvailable] = useState(false);
+  const [hotelPort, setHotelPort] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const views = [
-    { url: 'http://localhost:3000/#/er-dashboard', name: 'ER Dashboard' },
-    { url: 'http://localhost:4002/kiosk', name: 'Hotel Kiosk' }
-  ];
+  const getViews = () => [
+    { url: `${window.location.origin}/#/er-dashboard`, name: 'ER Dashboard' },
+    { url: hotelPort ? `http://localhost:${hotelPort}/kiosk` : null, name: 'Hotel Kiosk' }
+  ].filter(view => view.url);
 
-  // Check if Hotel Kiosk is available
+  // Check if Hotel Kiosk is available on either port
   useEffect(() => {
     const checkHotelKiosk = async () => {
-      try {
-        const response = await fetch('http://localhost:4002/kiosk', { mode: 'no-cors' });
-        setHotelKioskAvailable(true);
-      } catch (error) {
-        setHotelKioskAvailable(false);
+      const ports = [4001, 4002];
+      
+      for (const port of ports) {
+        try {
+          const response = await fetch(`http://localhost:${port}/kiosk`, { mode: 'no-cors' });
+          console.log(`Hotel Kiosk available on port ${port}`);
+          setHotelPort(port);
+          setHotelKioskAvailable(true);
+          return;
+        } catch (error) {
+          console.log(`Hotel Kiosk not available on port ${port}`);
+        }
       }
+      
+      console.log('Hotel Kiosk not available on any port, showing only ER Dashboard');
+      setHotelKioskAvailable(false);
     };
     checkHotelKiosk();
   }, []);
@@ -28,12 +39,13 @@ const AttractMode = () => {
   useEffect(() => {
     if (!hotelKioskAvailable) return;
 
+    const views = getViews();
     const interval = setInterval(() => {
       setCurrentView(prev => (prev + 1) % views.length);
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [hotelKioskAvailable, views.length]);
+  }, [hotelKioskAvailable, hotelPort]);
 
   // Handle exit on ESC key
   useEffect(() => {
@@ -85,25 +97,30 @@ const AttractMode = () => {
   return (
     <div className="attract-mode" onClick={isFullscreen ? exitAttractMode : undefined}>
       <div className="attract-container">
-        {hotelKioskAvailable ? (
-          views.map((view, index) => (
+        {(() => {
+          const views = getViews();
+          return hotelKioskAvailable ? (
+            views.map((view, index) => (
+              <iframe
+                key={index}
+                src={view.url}
+                className={`attract-iframe ${currentView === index ? 'active' : ''}`}
+                title={view.name}
+                frameBorder="0"
+              />
+            ))
+          ) : (
+            // Show only ER Dashboard when Hotel is not available
             <iframe
-              key={index}
-              src={view.url}
-              className={`attract-iframe ${currentView === index ? 'active' : ''}`}
-              title={view.name}
+              src={views[0].url}
+              className="attract-iframe active"
+              title={views[0].name}
               frameBorder="0"
             />
-          ))
-        ) : (
-          <iframe
-            src={views[0].url}
-            className="attract-iframe active"
-            title={views[0].name}
-            frameBorder="0"
-          />
-        )}
+          );
+        })()}
       </div>
+      
       {isFullscreen ? (
         <div className="exit-hint">Press ESC or click anywhere to exit</div>
       ) : (

@@ -112,14 +112,12 @@ const ERDashboard = () => {
   const mapInstanceRef = useRef(null);
   const channelRef = useRef(null);
   const videoRef = useRef(null);
-  const nextVideoRef = useRef(null);
-
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [activeVideoElement, setActiveVideoElement] = useState('video1');
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [backgroundVideo, setBackgroundVideo] = useState(() => {
+    const videos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
+    return videos[Math.floor(Math.random() * videos.length)];
+  });
+  const [nextVideo, setNextVideo] = useState(null);
   const [showAttribution, setShowAttribution] = useState(false);
-
-  const videoFiles = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
 
   // Only hide dashboard overlay in attract mode OR when inside iframe (for AttractMode)
   const isInIframe = window !== window.top;
@@ -164,63 +162,19 @@ const ERDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Presentation-style video transitions
-  useEffect(() => {
-    const video1 = videoRef.current;
-    const video2 = nextVideoRef.current;
-    if (!video1 || !video2) return;
-
-    const currentVideo = activeVideoElement === 'video1' ? video1 : video2;
-    const nextVideo = activeVideoElement === 'video1' ? video2 : video1;
-    const currentVideoFile = videoFiles[currentVideoIndex];
-    
-    // Load current video if not already loaded
-    if (!currentVideo.src.includes(currentVideoFile)) {
-      currentVideo.src = `/${currentVideoFile}`;
-      currentVideo.load();
-      currentVideo.oncanplay = () => {
-        currentVideo.play().catch(error => {
-          console.log('Video play interrupted:', error.message);
-        });
-      };
-    }
-    
-    // Preload next video
-    const nextIndex = (currentVideoIndex + 1) % videoFiles.length;
-    const nextVideoFile = videoFiles[nextIndex];
-    if (!nextVideo.src.includes(nextVideoFile)) {
-      nextVideo.src = `/${nextVideoFile}`;
-      nextVideo.load();
-    }
-    
-    // Set up transition timing
-    const handleTimeUpdate = () => {
-      if (currentVideo.duration - currentVideo.currentTime <= 0.5 && !isTransitioning) {
-        setIsTransitioning(true);
-        
-        // Start next video
-        if (nextVideo.readyState >= 3) {
-          nextVideo.currentTime = 0;
-          nextVideo.play().catch(error => {
-            console.log('Video play interrupted:', error.message);
-          });
-        }
-        
-        // Switch after brief delay
-        setTimeout(() => {
-          setActiveVideoElement(prev => prev === 'video1' ? 'video2' : 'video1');
-          setCurrentVideoIndex(nextIndex);
-          setIsTransitioning(false);
-        }, 500);
-      }
-    };
-    
-    currentVideo.addEventListener('timeupdate', handleTimeUpdate);
-    
-    return () => {
-      currentVideo.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [currentVideoIndex, activeVideoElement, isTransitioning]);
+  // Handle video end - play random video with crossfade
+  const handleVideoEnd = () => {
+    const videos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
+    let newVideo;
+    do {
+      newVideo = videos[Math.floor(Math.random() * videos.length)];
+    } while (newVideo === backgroundVideo && videos.length > 1);
+    setNextVideo(newVideo);
+    setTimeout(() => {
+      setBackgroundVideo(newVideo);
+      setNextVideo(null);
+    }, 500);
+  };
 
   // Mock patient ETA updates with location movement
   useEffect(() => {
@@ -428,11 +382,14 @@ const ERDashboard = () => {
 
   return (
     <div className="er-dashboard">
-      {/* Dual Video System with Smooth Crossfade */}
-      <video
-        ref={videoRef}
-        muted
-        playsInline
+      {/* Background Video with Crossfade */}
+      <video 
+        key={backgroundVideo} 
+        ref={videoRef} 
+        autoPlay 
+        muted 
+        playsInline 
+        onEnded={handleVideoEnd}
         style={{
           position: 'fixed',
           top: 0,
@@ -441,26 +398,35 @@ const ERDashboard = () => {
           height: '100vh',
           objectFit: 'cover',
           zIndex: -1,
-          opacity: activeVideoElement === 'video1' ? 1 : 0,
-          transition: 'opacity 0.8s ease-in-out'
+          opacity: nextVideo ? 0 : 1,
+          transition: 'opacity 0.5s ease-in-out'
         }}
-      />
-      <video
-        ref={nextVideoRef}
-        muted
-        playsInline
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          objectFit: 'cover',
-          zIndex: -1,
-          opacity: activeVideoElement === 'video2' ? 1 : 0,
-          transition: 'opacity 0.8s ease-in-out'
-        }}
-      />
+      >
+        <source src={`/${backgroundVideo}`} type="video/mp4" />
+      </video>
+      
+      {/* Preload next video for smooth transition */}
+      {nextVideo && (
+        <video 
+          key={nextVideo} 
+          autoPlay 
+          muted 
+          playsInline
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            objectFit: 'cover',
+            zIndex: -1,
+            opacity: 1,
+            transition: 'opacity 0.5s ease-in-out'
+          }}
+        >
+          <source src={`/${nextVideo}`} type="video/mp4" />
+        </video>
+      )}
       
       {/* Attribution Button */}
       <button
