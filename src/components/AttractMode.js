@@ -40,50 +40,56 @@ const AttractMode = () => {
   };
 
 
+  const hotelKioskAvailableRef = useRef(false);
+  const hotelPortRef = useRef(null);
+
   useEffect(() => {
     const checkHotelKiosk = async () => {
       const ports = [4001, 4002];
-      
       for (const port of ports) {
         try {
-          await fetch(`http://localhost:${port}/kiosk`, { mode: 'no-cors', cache: 'no-store' });
-          // Verify it's actually the Hotel app by checking for a known asset
           const check = await fetch(`http://localhost:${port}/hotel_logo.png`, { cache: 'no-store' });
           if (check.ok) {
             console.log(`Hotel Kiosk available on port ${port}`);
+            hotelPortRef.current = port;
+            hotelKioskAvailableRef.current = true;
             setHotelPort(port);
             setHotelKioskAvailable(true);
             return;
           }
-        } catch (error) {
+        } catch {
           console.log(`Hotel Kiosk not available on port ${port}`);
         }
       }
-      
       console.log('Hotel Kiosk not available on any port, showing only ER Dashboard');
+      hotelKioskAvailableRef.current = false;
       setHotelKioskAvailable(false);
     };
     checkHotelKiosk();
+    // Re-check every 30s so Hotel coming online is detected
+    const poll = setInterval(checkHotelKiosk, 30000);
+    return () => clearInterval(poll);
   }, []);
 
-  // Auto-rotate views every 8 seconds if both apps are available
+  // Always rotate — when Hotel unavailable, stay on view 0 (ER only) and keep sending VIEW_CHANGED
   useEffect(() => {
-    if (!hotelKioskAvailable) return;
-
-    const views = getViews();
     const interval = setInterval(() => {
       setCurrentView(prev => {
+        if (!hotelKioskAvailableRef.current) {
+          // ER-only: keep view 0, re-trigger VIEW_CHANGED so ERDashboard cycles its video
+          const ch = new BroadcastChannel('attract_mode_sync');
+          ch.postMessage({ type: 'VIEW_CHANGED', activeView: 0, activeTarget: 'er' });
+          ch.close();
+          return 0;
+        }
+        const views = getViews();
         const newView = (prev + 1) % views.length;
         currentViewRef.current = newView;
         const activeTarget = views[newView].name === 'Hotel Kiosk' ? 'hotel' : 'er';
-        // Pause only the outgoing iframe (same pattern as Hotel AttractMode)
-        const outgoingIndex = prev;
-        const outgoingTarget = views[outgoingIndex]?.name === 'Hotel Kiosk' ? 'hotel' : 'er';
+        const outgoingTarget = views[prev]?.name === 'Hotel Kiosk' ? 'hotel' : 'er';
         if (outgoingTarget === 'hotel') {
-          // Hotel iframe is cross-origin: postMessage only
-          iframeRefs.current[outgoingIndex]?.contentWindow?.postMessage({ type: 'PAUSE_ALL', source: 'attract_mode' }, '*');
+          iframeRefs.current[prev]?.contentWindow?.postMessage({ type: 'PAUSE_ALL', source: 'attract_mode' }, '*');
         } else {
-          // ER iframe is same-origin: BroadcastChannel only (avoids double-pause)
           const ch = new BroadcastChannel('attract_mode_sync');
           ch.postMessage({ type: 'PAUSE_ALL' });
           ch.close();
@@ -92,19 +98,23 @@ const AttractMode = () => {
         return newView;
       });
     }, 8000);
-
     return () => clearInterval(interval);
-  }, [hotelKioskAvailable, hotelPort]);
+  }, [hotelPort]);
 
-  // Broadcast initial view state immediately so inactive iframe pauses from the start
+  // Broadcast initial VIEW_CHANGED on mount so ER iframe starts playing immediately
   useEffect(() => {
-    const views = getViews();
-    const activeTarget = views[0]?.name === 'Hotel Kiosk' ? 'hotel' : 'er';
-    currentViewRef.current = 0;
-    // Use a short delay only to allow iframes to mount their message listeners
-    const timer = setTimeout(() => broadcast({ type: 'VIEW_CHANGED', activeView: 0, activeTarget }), 500);
+    const timer = setTimeout(() => broadcast({ type: 'VIEW_CHANGED', activeView: 0, activeTarget: 'er' }), 500);
     return () => clearTimeout(timer);
-  }, [hotelKioskAvailable]); // re-run when hotel becomes available so hotel iframe also gets the signal
+  }, []);
+
+  // Re-broadcast when hotel becomes available so hotel iframe gets the initial signal
+  useEffect(() => {
+    if (!hotelKioskAvailable) return;
+    const views = getViews();
+    const activeTarget = views[currentViewRef.current]?.name === 'Hotel Kiosk' ? 'hotel' : 'er';
+    const timer = setTimeout(() => broadcast({ type: 'VIEW_CHANGED', activeView: currentViewRef.current, activeTarget }), 500);
+    return () => clearTimeout(timer);
+  }, [hotelKioskAvailable]);
 
   // Handle TRY_NOW from iframe — exit fullscreen, focus opener, close presentation tab
   useEffect(() => {
