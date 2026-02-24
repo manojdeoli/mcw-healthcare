@@ -707,7 +707,7 @@ const ERDashboard = () => {
       )}
       
       {/* Dashboard - shown in standalone mode OR as overlay on frozen video in presentation */}
-      {(!isAttractMode || showPresentationOverlay) && (
+      {(!isAttractMode || isInIframe) && (
         <div
           className="monitor-screen"
           style={isInIframe ? { opacity: showPresentationOverlay ? 1 : 0, transition: 'opacity 1s ease', pointerEvents: 'none' } : undefined}
@@ -917,6 +917,7 @@ const ERDashboard = () => {
                         src="https://www.openstreetmap.org/export/embed.html?bbox=1.9%2C41.25%2C2.35%2C41.55&layer=mapnik&marker=41.387%2C2.118"
                         style={{ width: '100%', height: 'clamp(200px, 25vh, 350px)', borderRadius: '4px', border: 'none', display: 'block' }}
                         title="Barcelona map"
+                        loading="eager"
                       />
                     ) : (
                       <div ref={mapRef} style={{ height: 'clamp(200px, 25vh, 350px)', width: '100%', borderRadius: '4px' }}></div>
