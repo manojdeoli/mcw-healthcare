@@ -112,12 +112,20 @@ const ERDashboard = () => {
   const mapInstanceRef = useRef(null);
   const channelRef = useRef(null);
   const videoRef = useRef(null);
+  const currentVideoRef = useRef(null); // ref to track current video without stale closure
+  const audioEnabledRef = useRef(false); // ref to avoid stale closure in BroadcastChannel handler
+  const isHealthcareActiveRef = useRef(true); // ref to check active state inside playVideo closure
   const [backgroundVideo, setBackgroundVideo] = useState(() => {
     const videos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
-    return videos[Math.floor(Math.random() * videos.length)];
+    const initial = videos[Math.floor(Math.random() * videos.length)];
+    currentVideoRef.current = initial;
+    return initial;
   });
   const [nextVideo, setNextVideo] = useState(null);
   const [showAttribution, setShowAttribution] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [showAudioPrompt, setShowAudioPrompt] = useState(true);
+  const [isHealthcareActive, setIsHealthcareActive] = useState(true);
 
   // Only hide dashboard overlay in attract mode OR when inside iframe (for AttractMode)
   const isInIframe = window !== window.top;
@@ -162,18 +170,154 @@ const ERDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Handle video end - play random video with crossfade
-  const handleVideoEnd = () => {
+  // Video rotation
+  useEffect(() => {
     const videos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
-    let newVideo;
-    do {
-      newVideo = videos[Math.floor(Math.random() * videos.length)];
-    } while (newVideo === backgroundVideo && videos.length > 1);
-    setNextVideo(newVideo);
-    setTimeout(() => {
-      setBackgroundVideo(newVideo);
-      setNextVideo(null);
-    }, 500);
+    const canPlayHandlerRef = { current: null };
+
+    const playVideo = (src) => {
+      if (!videoRef.current) return;
+      if (canPlayHandlerRef.current) {
+        videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
+        canPlayHandlerRef.current = null;
+      }
+      const handler = () => {
+        videoRef.current?.removeEventListener('canplay', handler);
+        canPlayHandlerRef.current = null;
+        if (!isHealthcareActiveRef.current) return;
+        videoRef.current.muted = !audioEnabledRef.current;
+        videoRef.current?.play().catch(() => {});
+      };
+      canPlayHandlerRef.current = handler;
+      videoRef.current.addEventListener('canplay', handler);
+      videoRef.current.src = src;
+      videoRef.current.load();
+    };
+
+    // Expose playVideo for VIEW_CHANGED handler
+    window.__erPlayVideo = playVideo;
+
+    // In iframe: no internal timer — VIEW_CHANGED controls when to start a new video
+    // In standalone: rotate every 8s
+    if (isInIframe) {
+      playVideo(`/${currentVideoRef.current}`);
+      return () => {
+        delete window.__erPlayVideo;
+        if (canPlayHandlerRef.current && videoRef.current) {
+          videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
+        }
+      };
+    }
+
+    playVideo(`/${currentVideoRef.current}`);
+    const videoRotationTimer = setInterval(() => {
+      let newVideo;
+      do {
+        newVideo = videos[Math.floor(Math.random() * videos.length)];
+      } while (newVideo === currentVideoRef.current && videos.length > 1);
+      currentVideoRef.current = newVideo;
+      playVideo(`/${newVideo}`);
+    }, 8000);
+
+    return () => {
+      clearInterval(videoRotationTimer);
+      delete window.__erPlayVideo;
+      if (canPlayHandlerRef.current && videoRef.current) {
+        videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
+      }
+    };
+  }, [isInIframe]);
+  // Watchdog: resume video if browser suspends/stalls it while this view is active
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const resume = () => {
+      if (isHealthcareActiveRef.current && video.paused && !video.ended) {
+        video.play().catch(() => {});
+      }
+    };
+    video.addEventListener('stalled', resume);
+    video.addEventListener('suspend', resume);
+    video.addEventListener('waiting', resume);
+    return () => {
+      video.removeEventListener('stalled', resume);
+      video.removeEventListener('suspend', resume);
+      video.removeEventListener('waiting', resume);
+    };
+  }, []);
+  // Audio control for attract mode - handleAudioMessage defined inside effect to avoid stale closure
+  useEffect(() => {
+    if (!isAttractMode) return;
+
+    const handleAudioMessage = (data) => {
+    const { type, activeView } = data;
+    if (type === 'PAUSE_ALL') {
+      if (videoRef.current) { videoRef.current.pause(); videoRef.current.muted = true; }
+    } else if (type === 'VIEW_CHANGED') {
+      const isActive = data.activeTarget ? data.activeTarget === 'er' : activeView === 0;
+      setIsHealthcareActive(isActive);
+      isHealthcareActiveRef.current = isActive;
+      if (videoRef.current) {
+        if (isActive) {
+          // Start a fresh random video each time ER becomes active
+          const videos = ['ER-1.mp4','ER-2.mp4','ER-3.mp4','ER-4.mp4','ER-5.mp4','ER-6.mp4','ER-7.mp4','ER-8.mp4','ER-9.mp4'];
+          let newVideo;
+          do {
+            newVideo = videos[Math.floor(Math.random() * videos.length)];
+          } while (newVideo === currentVideoRef.current && videos.length > 1);
+          currentVideoRef.current = newVideo;
+          const v = videoRef.current;
+          v.muted = !audioEnabledRef.current;
+          const onCanPlay = () => { v.removeEventListener('canplay', onCanPlay); if (isHealthcareActiveRef.current) v.play().catch(() => {}); };
+          v.addEventListener('canplay', onCanPlay);
+          v.src = `/${newVideo}`;
+          v.load();
+        } else {
+          videoRef.current.muted = true;
+          videoRef.current.pause();
+        }
+      }
+    } else if (type === 'SOUND_TOGGLE') {
+      if (data.target && data.target !== 'er') return;
+      const newState = data.hasOwnProperty('enabled') ? data.enabled : !audioEnabledRef.current;
+      audioEnabledRef.current = newState;
+      setAudioEnabled(newState);
+      if (videoRef.current) {
+        // Only unmute if ER is the currently active view; always allow muting
+        videoRef.current.muted = !newState || !isHealthcareActiveRef.current;
+      }
+    }
+  };
+
+    const channel = new BroadcastChannel('attract_mode_sync');
+    channel.onmessage = (event) => handleAudioMessage(event.data);
+    const handlePostMessage = (event) => handleAudioMessage(event.data);
+    window.addEventListener('message', handlePostMessage);
+
+    return () => {
+      channel.close();
+      window.removeEventListener('message', handlePostMessage);
+    };
+  }, [isAttractMode]);
+
+  // Toggle audio mute/unmute
+  const toggleAudio = async () => {
+    const newAudioState = !audioEnabled;
+    setAudioEnabled(newAudioState);
+    audioEnabledRef.current = newAudioState; // keep ref in sync
+    
+    if (videoRef.current) {
+      videoRef.current.muted = !newAudioState;
+      if (newAudioState) {
+        setShowAudioPrompt(false);
+        try {
+          await videoRef.current.play();
+        } catch (error) {
+          console.log('Audio autoplay failed, keeping muted');
+          setAudioEnabled(false);
+        }
+      }
+    }
   };
 
   // Mock patient ETA updates with location movement
@@ -382,14 +526,16 @@ const ERDashboard = () => {
 
   return (
     <div className="er-dashboard">
-      {/* Background Video with Crossfade */}
+      {/* Background Video - Timer Controlled */}
       <video 
-        key={backgroundVideo} 
         ref={videoRef} 
         autoPlay 
         muted 
         playsInline 
-        onEnded={handleVideoEnd}
+        preload="auto"
+        onEnded={() => {
+          if (!isInIframe) return; // standalone uses timer; in iframe, just stop — VIEW_CHANGED will start fresh
+        }}
         style={{
           position: 'fixed',
           top: 0,
@@ -397,35 +543,39 @@ const ERDashboard = () => {
           width: '100vw',
           height: '100vh',
           objectFit: 'cover',
-          zIndex: -1,
-          opacity: nextVideo ? 0 : 1,
-          transition: 'opacity 0.5s ease-in-out'
+          zIndex: -1
         }}
-      >
-        <source src={`/${backgroundVideo}`} type="video/mp4" />
-      </video>
+      />
       
-      {/* Preload next video for smooth transition */}
-      {nextVideo && (
-        <video 
-          key={nextVideo} 
-          autoPlay 
-          muted 
-          playsInline
+      {/* Audio Toggle Button - Only show in attract mode */}
+      {isAttractMode && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleAudio();
+          }}
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            objectFit: 'cover',
-            zIndex: -1,
-            opacity: 1,
-            transition: 'opacity 0.5s ease-in-out'
+            top: '20px',
+            right: '100px',
+            background: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            border: '2px solid #007bff',
+            borderRadius: '50%',
+            width: '50px',
+            height: '50px',
+            fontSize: '20px',
+            cursor: 'pointer',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
           }}
+          title={audioEnabled ? "Mute Sound" : "Enable Sound"}
         >
-          <source src={`/${nextVideo}`} type="video/mp4" />
-        </video>
+          {audioEnabled ? '🔇' : '🔊'}
+        </button>
       )}
       
       {/* Attribution Button */}
@@ -483,6 +633,31 @@ const ERDashboard = () => {
           </button>
           <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Video Source:</div>
           <div>Video generated by Oliver Holland using Google Gemini (Veo 3.1), 23 February 2026, using the prompt: "Create a 10 second video of a hospital Emergency Room from the stationary camera perspective of just inside the entrance door. Don't focus on any specific individuals or interactions"</div>
+        </div>
+      )}
+      
+      {/* Demo Banner - Only show in attract mode */}
+      {isAttractMode && (
+        <div style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'rgba(0, 0, 0, 0.3)',
+          color: 'white',
+          padding: '15px 20px',
+          fontSize: '0.75rem',
+          lineHeight: '1.4',
+          zIndex: 15,
+          textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)'
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '0.8rem' }}>Healthcare Enhancements using Network APIs</div>
+          <div>A demo of healthcare enhancement solutions using CAMARA Network APIs and aggregators. Specifically:</div>
+          <ul style={{ margin: '5px 0', paddingLeft: '15px' }}>
+            <li>Automated patient registration, tracking of their transport and (in advance) arrival/care planning for emergency medical transport in a case of a medical emergency.</li>
+            <li>Monitoring for abscondment from the hospital, and abscondment management.</li>
+            <li>Outpatient monitoring for patients with chronic conditions.</li>
+          </ul>
         </div>
       )}
       
