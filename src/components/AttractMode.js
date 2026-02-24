@@ -46,11 +46,15 @@ const AttractMode = () => {
       
       for (const port of ports) {
         try {
-          const response = await fetch(`http://localhost:${port}/kiosk`, { mode: 'no-cors' });
-          console.log(`Hotel Kiosk available on port ${port}`);
-          setHotelPort(port);
-          setHotelKioskAvailable(true);
-          return;
+          await fetch(`http://localhost:${port}/kiosk`, { mode: 'no-cors', cache: 'no-store' });
+          // Verify it's actually the Hotel app by checking for a known asset
+          const check = await fetch(`http://localhost:${port}/hotel_logo.png`, { cache: 'no-store' });
+          if (check.ok) {
+            console.log(`Hotel Kiosk available on port ${port}`);
+            setHotelPort(port);
+            setHotelKioskAvailable(true);
+            return;
+          }
         } catch (error) {
           console.log(`Hotel Kiosk not available on port ${port}`);
         }
@@ -101,6 +105,25 @@ const AttractMode = () => {
     const timer = setTimeout(() => broadcast({ type: 'VIEW_CHANGED', activeView: 0, activeTarget }), 500);
     return () => clearTimeout(timer);
   }, [hotelKioskAvailable]); // re-run when hotel becomes available so hotel iframe also gets the signal
+
+  // Handle TRY_NOW from iframe — exit fullscreen, focus opener, close presentation tab
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.data?.type !== 'TRY_NOW') return;
+      const close = async () => {
+        try { if (document.fullscreenElement) await document.exitFullscreen(); } catch {}
+        if (window.opener) {
+          window.opener.focus();
+          window.close();
+        } else {
+          window.location.hash = '/';
+        }
+      };
+      close();
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
 
   // Handle exit on ESC key
   useEffect(() => {
