@@ -912,7 +912,15 @@ const ERDashboard = () => {
                 <div className="er-sidebar">
                   <div className="map-panel">
                     <h3>Live Patient Tracking</h3>
-                    <div ref={mapRef} style={{ height: 'clamp(200px, 25vh, 350px)', width: '100%', borderRadius: '4px' }}></div>
+                    {isInIframe ? (
+                      <iframe
+                        src="https://www.openstreetmap.org/export/embed.html?bbox=1.9%2C41.25%2C2.35%2C41.55&layer=mapnik&marker=41.387%2C2.118"
+                        style={{ width: '100%', height: 'clamp(200px, 25vh, 350px)', borderRadius: '4px', border: 'none', display: 'block' }}
+                        title="Barcelona map"
+                      />
+                    ) : (
+                      <div ref={mapRef} style={{ height: 'clamp(200px, 25vh, 350px)', width: '100%', borderRadius: '4px' }}></div>
+                    )}
                   </div>
 
                   <div className="resource-panel">
