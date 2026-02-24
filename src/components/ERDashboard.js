@@ -126,6 +126,9 @@ const ERDashboard = () => {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [showAudioPrompt, setShowAudioPrompt] = useState(true);
   const [isHealthcareActive, setIsHealthcareActive] = useState(true);
+  const [showPresentationOverlay, setShowPresentationOverlay] = useState(false);
+  const videoCountRef = useRef(0);
+  const overlayTimersRef = useRef([]);
 
   // Only hide dashboard overlay in attract mode OR when inside iframe (for AttractMode)
   const isInIframe = window !== window.top;
@@ -232,7 +235,7 @@ const ERDashboard = () => {
     const video = videoRef.current;
     if (!video) return;
     const resume = () => {
-      if (isHealthcareActiveRef.current && video.paused && !video.ended) {
+      if (isHealthcareActiveRef.current && video.paused && !video.ended && !overlayTimersRef.current.length) {
         video.play().catch(() => {});
       }
     };
@@ -259,20 +262,41 @@ const ERDashboard = () => {
       isHealthcareActiveRef.current = isActive;
       if (videoRef.current) {
         if (isActive) {
-          // Start a fresh random video each time ER becomes active
+          videoCountRef.current += 1;
           const videos = ['ER-1.mp4','ER-2.mp4','ER-3.mp4','ER-4.mp4','ER-5.mp4','ER-6.mp4','ER-7.mp4','ER-8.mp4','ER-9.mp4'];
-          let newVideo;
-          do {
-            newVideo = videos[Math.floor(Math.random() * videos.length)];
-          } while (newVideo === currentVideoRef.current && videos.length > 1);
-          currentVideoRef.current = newVideo;
-          const v = videoRef.current;
-          v.muted = !audioEnabledRef.current;
-          const onCanPlay = () => { v.removeEventListener('canplay', onCanPlay); if (isHealthcareActiveRef.current) v.play().catch(() => {}); };
-          v.addEventListener('canplay', onCanPlay);
-          v.src = `/${newVideo}`;
-          v.load();
+          const startNextVideo = () => {
+            if (!isHealthcareActiveRef.current) return;
+            let newVideo;
+            do { newVideo = videos[Math.floor(Math.random() * videos.length)]; }
+            while (newVideo === currentVideoRef.current && videos.length > 1);
+            currentVideoRef.current = newVideo;
+            const v = videoRef.current;
+            if (!v) return;
+            v.muted = !audioEnabledRef.current;
+            const onCanPlay = () => { v.removeEventListener('canplay', onCanPlay); if (isHealthcareActiveRef.current) v.play().catch(() => {}); };
+            v.addEventListener('canplay', onCanPlay);
+            v.src = `/${newVideo}`;
+            v.load();
+          };
+          if (videoCountRef.current % 3 !== 0) {
+            startNextVideo();
+          } else {
+            // Every 3rd activation: show overlay, start next video immediately (plays behind overlay),
+            // then fade out overlay after 6s for smooth transition
+            setShowPresentationOverlay(true);
+            setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
+            startNextVideo(); // load next video now so it's ready when overlay fades
+            const t1 = setTimeout(() => {
+              setShowPresentationOverlay(false);
+              overlayTimersRef.current = [];
+            }, 6000);
+            overlayTimersRef.current = [t1];
+          }
         } else {
+          // Cancel overlay if switching away
+          overlayTimersRef.current.forEach(t => clearTimeout(t));
+          overlayTimersRef.current = [];
+          setShowPresentationOverlay(false);
           videoRef.current.muted = true;
           videoRef.current.pause();
         }
@@ -534,7 +558,8 @@ const ERDashboard = () => {
         playsInline 
         preload="auto"
         onEnded={() => {
-          if (!isInIframe) return; // standalone uses timer; in iframe, just stop — VIEW_CHANGED will start fresh
+          if (!isInIframe) return;
+          // In iframe mode, VIEW_CHANGED drives the cycle — nothing to do on ended
         }}
         style={{
           position: 'fixed',
@@ -681,9 +706,12 @@ const ERDashboard = () => {
         </div>
       )}
       
-      {/* Dashboard - Only show if not in attract mode */}
-      {!isAttractMode && (
-        <div className="monitor-screen">
+      {/* Dashboard - shown in standalone mode OR as overlay on frozen video in presentation */}
+      {(!isAttractMode || showPresentationOverlay) && (
+        <div
+          className="monitor-screen"
+          style={isInIframe ? { opacity: showPresentationOverlay ? 1 : 0, transition: 'opacity 1s ease', pointerEvents: 'none' } : undefined}
+        >
           <div className="monitor-content">
             <div className="er-content">
               <div className="er-header">
@@ -913,7 +941,7 @@ const ERDashboard = () => {
             </div>
           </div>
         {/* Patient Detail Card Popup within Monitor */}
-        {showDetailCard && selectedPatient && (
+        {showDetailCard && selectedPatient && !isInIframe && (
           <div className="patient-detail-popup" style={{
             position: 'absolute',
             top: '5%',
