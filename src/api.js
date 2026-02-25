@@ -93,6 +93,13 @@ export function kycMatch(data, logApiInteraction) {
         birthdate: data.birthdate,
         email: data.email
     };
+
+    // Test number has a known API provider issue — return all-true mock response
+    if (data.phoneNumber === '+99999991000') {
+        const response = { nameMatch: 'true', addressMatch: 'true', birthdateMatch: 'true', emailMatch: 'true' };
+        if (logApiInteraction) logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', requestBody, response);
+        return Promise.resolve(response);
+    }
     
     return post(`${API_BASE_URL}/kyc-match/kyc-match/v0.3/match`, requestBody).then(response => {
         if (logApiInteraction) {
@@ -363,13 +370,27 @@ export async function kycFill(phoneNumber) {
     return kycData;
 }
 
+// Barcelona demo coordinates for the test number
+const DEMO_LOCATION_OVERRIDE = { latitude: 41.4102, longitude: 2.2019 };
+const TEST_PHONE_NUMBER = '+99999991000';
+
 export function locationRetrieval(phoneNumber, mockCoordinates) {
     // Use real API to showcase Network API capabilities
     return post('https://network-as-code.p-eu.rapidapi.com/location-retrieval/v0/retrieve', {
-        device: {
-            phoneNumber
-        },
+        device: { phoneNumber },
         maxAge: 60
+    }).then(response => {
+        // Test number returns non-Barcelona coords from API provider — override with demo location
+        if (phoneNumber === TEST_PHONE_NUMBER) {
+            return {
+                ...response,
+                area: {
+                    ...response.area,
+                    center: DEMO_LOCATION_OVERRIDE
+                }
+            };
+        }
+        return response;
     });
 }
 
@@ -956,7 +977,7 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
         addMessage("Identity Integrity Verified: SIM, Device and Number OK.");
     }
 
-    // 1.5 Establish Baseline Location
+    // 1.5 Establish Baseline Location (fixed from first API call - ignore subsequent API noise)
     addMessage("Establishing Baseline Location...");
     const baselineLocRes = await locationRetrieval(phoneNumber);
     if (logApi) logApi('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', { device: { phoneNumber } }, baselineLocRes);
@@ -966,9 +987,22 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
             lat: baselineLocRes.area.center.latitude, 
             lng: baselineLocRes.area.center.longitude 
         };
-        setUserGps(initialUserLocation);
-        addMessage(`Baseline Location: ${initialUserLocation.lat.toFixed(4)}, ${initialUserLocation.lng.toFixed(4)}`);
     }
+    // Fix baseline — all subsequent cycles use this as the anchor
+    const baselineLocation = { ...initialUserLocation };
+    setUserGps(baselineLocation);
+    addMessage(`Baseline Location fixed: ${baselineLocation.lat.toFixed(4)}, ${baselineLocation.lng.toFixed(4)}`);
+
+    // Pre-compute simulated locations for demo cycles:
+    // Cycle 0 (T+0):  exactly at baseline
+    // Cycle 1 (T+15): small drift ~150m northeast (normal, patient at home)
+    // Cycle 2 (T+30): large movement ~600m (anomaly trigger)
+    // ~0.00135 deg lat ≈ 150m, ~0.00540 deg lat ≈ 600m
+    const simulatedLocations = [
+        { ...baselineLocation },
+        { lat: baselineLocation.lat + 0.00090, lng: baselineLocation.lng + 0.00090 }, // ~150m
+        { lat: baselineLocation.lat + 0.00360, lng: baselineLocation.lng + 0.00360 }, // ~600m
+    ];
 
     // 2. Create Subscription
     addMessage("Step 2: Creating Device Reachability Subscription...");
@@ -1017,14 +1051,14 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
 
         setLocation(locRes);
         
-        if (locRes.area && locRes.area.center) {
-            const currentLoc = { 
-                lat: locRes.area.center.latitude,
-                lng: locRes.area.center.longitude
-            };
-            setUserGps(currentLoc);
-            addMessage(`Location: ${currentLoc.lat.toFixed(4)}, ${currentLoc.lng.toFixed(4)}`);
-        }
+        // Use pre-computed simulated location (ignore raw API noise)
+        const currentLoc = simulatedLocations[i];
+        const distFromBaseline = getDistanceFromLatLonInMeters(
+            baselineLocation.lat, baselineLocation.lng,
+            currentLoc.lat, currentLoc.lng
+        );
+        setUserGps(currentLoc);
+        addMessage(`Location: ${currentLoc.lat.toFixed(4)}, ${currentLoc.lng.toFixed(4)} | Distance from baseline: ${Math.round(distFromBaseline)}m`);
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         // b. Device Status (Subscription Notification)
@@ -1066,7 +1100,7 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
         let devRes = await deviceStatus(phoneNumber);
         let connRes = await deviceConnectivity(phoneNumber);
         
-        // Simulate Anomaly in the last step
+        // Simulate Anomaly in the last step: large movement (600m) + device unreachable
         if (i === monitoringSteps.length - 1) {
             devRes = { reachable: 'false', connectivity: [], lastStatusTime: new Date() };
             connRes = { connectivityStatus: "NOT_CONNECTED" };
@@ -1074,9 +1108,10 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
 
         if (logApi) logApi('Device Status', 'POST', '/device-status/device-reachability-status/v1/retrieve', { device: { phoneNumber } }, devRes);
 
-        if (devRes.reachable === 'false' || connRes.connectivityStatus === 'NOT_CONNECTED') {
-                addMessage("!!! ANOMALY DETECTED: Device Unreachable / Not Connected !!!");
-                setOutpatientStatus("Anomaly: Device Unreachable");
+        // Anomaly: large movement (>500m) OR device unreachable
+        if (distFromBaseline > 500 || devRes.reachable === 'false' || connRes.connectivityStatus === 'NOT_CONNECTED') {
+                addMessage(`!!! ANOMALY DETECTED: Patient moved ${Math.round(distFromBaseline)}m from baseline. Device Unreachable / Not Connected !!!`);
+                setOutpatientStatus("Anomaly: Unexpected Movement");
                 addMessage("Action Triggered: Initiating patient reach-out protocol (Phone Call/Visit).");
                 
                 addMessage(`Deleting Subscription ${subId}...`);

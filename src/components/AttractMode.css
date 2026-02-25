@@ -6,7 +6,6 @@
   height: 100vh;
   background: #000;
   overflow: hidden;
-  cursor: pointer;
   z-index: 9999;
 }
 
@@ -39,6 +38,16 @@
   transform: translateX(-100%);
 }
 
+.click-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  cursor: pointer;
+}
+
 .exit-hint {
   position: fixed;
   bottom: 20px;
@@ -69,10 +78,10 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 15px 30px;
-  font-size: 16px;
+  padding: 8px 16px;
+  font-size: 12px;
   font-weight: bold;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   z-index: 10001;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
