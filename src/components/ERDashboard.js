@@ -9,6 +9,19 @@ import emergencyRoomBg from '../emergency.png';
 const HOSPITAL_LOCATION = { lat: 41.38697, lng: 2.1182 }; // Barcelona - Les Corts residential area
 const MAP_CENTER = { lat: 41.38697, lng: 2.1182 };
 
+// URL-based presentation configuration
+const getPresentationConfig = () => {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    overlayDelayMs: parseInt(params.get('overlayDelay')) || 5000,
+    overlayFadeInMs: parseInt(params.get('fadeIn')) || 1200,
+    freezeFrameDurationMs: parseInt(params.get('freezeDuration')) || 3500,
+    overlayPersistent: params.get('persistent') !== 'false'
+  };
+};
+
+const PRESENTATION_CONFIG = getPresentationConfig();
+
 const mockAdditionalPatients = [
   {
     id: 'CIP-3847291056',
@@ -129,6 +142,7 @@ const ERDashboard = () => {
   const [showPresentationOverlay, setShowPresentationOverlay] = useState(false);
   const videoCountRef = useRef(0);
   const overlayTimersRef = useRef([]);
+  const videoEndedRef = useRef(false);
 
   // Only hide dashboard overlay in attract mode OR when inside iframe (for AttractMode)
   const isInIframe = window !== window.top;
@@ -294,16 +308,57 @@ const ERDashboard = () => {
             v.src = `/${newVideo}`;
             v.load();
           };
-          // Every activation: show overlay, start next video immediately (plays behind overlay),
-            // then fade out overlay after 6s for smooth transition
-            setShowPresentationOverlay(true);
-            setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
-            startNextVideo(); // load next video now so it's ready when overlay fades
-            const t1 = setTimeout(() => {
-              setShowPresentationOverlay(false);
-              overlayTimersRef.current = [];
-            }, 6000);
-            overlayTimersRef.current = [t1];
+          // Every activation: delay overlay appearance, start next video immediately,
+          // then show overlay with fade-in after configured delay
+          const startNextVideo = () => {
+            if (!isHealthcareActiveRef.current) return;
+            let newVideo;
+            do { newVideo = videos[Math.floor(Math.random() * videos.length)]; }
+            while (newVideo === currentVideoRef.current && videos.length > 1);
+            currentVideoRef.current = newVideo;
+            const v = videoRef.current;
+            if (!v) return;
+            v.muted = !audioEnabledRef.current;
+            videoEndedRef.current = false;
+            
+            const onCanPlay = () => { 
+              v.removeEventListener('canplay', onCanPlay); 
+              if (isHealthcareActiveRef.current) {
+                v.play().catch(() => {});
+                // Add video ended handler for freeze frame
+                const onEnded = () => {
+                  v.removeEventListener('ended', onEnded);
+                  videoEndedRef.current = true;
+                  // Freeze on last frame
+                  v.currentTime = v.duration;
+                  // Hold freeze frame for configured duration
+                  const freezeTimer = setTimeout(() => {
+                    if (isHealthcareActiveRef.current) {
+                      // Transition to next video after freeze
+                      startNextVideo();
+                    }
+                  }, PRESENTATION_CONFIG.freezeFrameDurationMs);
+                  overlayTimersRef.current.push(freezeTimer);
+                };
+                v.addEventListener('ended', onEnded);
+              }
+            };
+            v.addEventListener('canplay', onCanPlay);
+            v.src = `/${newVideo}`;
+            v.load();
+          };
+          
+          startNextVideo(); // Start video immediately
+          
+          // Delay overlay appearance as configured
+          const overlayTimer = setTimeout(() => {
+            if (isHealthcareActiveRef.current) {
+              setShowPresentationOverlay(true);
+              setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
+            }
+          }, PRESENTATION_CONFIG.overlayDelayMs);
+          
+          overlayTimersRef.current = [overlayTimer];
           } else {
           // Cancel overlay if switching away
           overlayTimersRef.current.forEach(t => clearTimeout(t));
@@ -689,7 +744,11 @@ const ERDashboard = () => {
       {(!isAttractMode || isInIframe) && (
         <div
           className="monitor-screen"
-          style={isInIframe ? { opacity: showPresentationOverlay ? 0.72 : 0, transition: 'opacity 1.2s ease', pointerEvents: 'none' } : undefined}
+          style={isInIframe ? { 
+            opacity: showPresentationOverlay ? 0.72 : 0, 
+            transition: `opacity ${PRESENTATION_CONFIG.overlayFadeInMs}ms ease-in-out`,
+            pointerEvents: 'none' 
+          } : undefined}
         >
           <div className="monitor-content">
             <div className="er-content">
