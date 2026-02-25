@@ -218,16 +218,7 @@ const ERDashboard = () => {
     if (isInIframe) {
       playVideo(`/${currentVideoRef.current}`);
       
-      // Add video end handler that pauses (like hotel does)
-      const handleVideoEnd = () => {
-        if (videoRef.current) {
-          videoRef.current.pause();
-        }
-      };
-      videoRef.current?.addEventListener('ended', handleVideoEnd);
-      
       return () => {
-        videoRef.current?.removeEventListener('ended', handleVideoEnd);
         delete window.__erPlayVideo;
         if (canPlayHandlerRef.current && videoRef.current) {
           videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
@@ -336,17 +327,20 @@ const ERDashboard = () => {
             v.load();
           };
           
-          startNextVideo(); // Start video immediately
-          
-          // Delay overlay appearance as configured
-          const overlayTimer = setTimeout(() => {
-            if (isHealthcareActiveRef.current) {
-              setShowPresentationOverlay(true);
-              setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
-            }
-          }, PRESENTATION_CONFIG.overlayDelayMs);
-          
-          overlayTimersRef.current = [overlayTimer];
+          // Only start video on first activation, then let video end handler control transitions
+          if (videoCountRef.current === 1) {
+            startNextVideo(); // Start video immediately only on first activation
+            
+            // Delay overlay appearance as configured
+            const overlayTimer = setTimeout(() => {
+              if (isHealthcareActiveRef.current) {
+                setShowPresentationOverlay(true);
+                setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
+              }
+            }, PRESENTATION_CONFIG.overlayDelayMs);
+            
+            overlayTimersRef.current = [overlayTimer];
+          }
           } else {
           // Cancel overlay if switching away
           overlayTimersRef.current.forEach(t => clearTimeout(t));
