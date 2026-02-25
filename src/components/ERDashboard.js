@@ -204,7 +204,23 @@ const ERDashboard = () => {
     // In standalone: rotate every 8s
     if (isInIframe) {
       playVideo(`/${currentVideoRef.current}`);
+
+      // Brief black pause (1.5s) between videos so the end of each clip is perceptible
+      const handleEnded = () => {
+        if (!isHealthcareActiveRef.current) return;
+        setTimeout(() => {
+          if (!isHealthcareActiveRef.current) return;
+          let newVideo;
+          do { newVideo = videos[Math.floor(Math.random() * videos.length)]; }
+          while (newVideo === currentVideoRef.current && videos.length > 1);
+          currentVideoRef.current = newVideo;
+          playVideo(`/${newVideo}`);
+        }, 1500);
+      };
+      videoRef.current?.addEventListener('ended', handleEnded);
+
       return () => {
+        videoRef.current?.removeEventListener('ended', handleEnded);
         delete window.__erPlayVideo;
         if (canPlayHandlerRef.current && videoRef.current) {
           videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
