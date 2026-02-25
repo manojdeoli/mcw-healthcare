@@ -280,6 +280,10 @@ const ERDashboard = () => {
           videoCountRef.current += 1;
           const videos = ['ER-1.mp4','ER-2.mp4','ER-3.mp4','ER-4.mp4','ER-5.mp4','ER-6.mp4','ER-7.mp4','ER-8.mp4','ER-9.mp4'];
           
+          // Clear any existing timers first
+          overlayTimersRef.current.forEach(t => clearTimeout(t));
+          overlayTimersRef.current = [];
+          
           // Every activation: delay overlay appearance, start next video immediately,
           // then show overlay with fade-in after configured delay
           const startNextVideo = () => {
@@ -311,7 +315,7 @@ const ERDashboard = () => {
                       // Brief pause before next video
                       setTimeout(() => {
                         if (isHealthcareActiveRef.current) {
-                          // Transition to next video after freeze
+                          // Transition to next video after freeze - only if still active
                           startNextVideo();
                         }
                       }, 500);
@@ -327,20 +331,18 @@ const ERDashboard = () => {
             v.load();
           };
           
-          // Only start video on first activation, then let video end handler control transitions
-          if (videoCountRef.current === 1) {
-            startNextVideo(); // Start video immediately only on first activation
-            
-            // Delay overlay appearance as configured
-            const overlayTimer = setTimeout(() => {
-              if (isHealthcareActiveRef.current) {
-                setShowPresentationOverlay(true);
-                setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
-              }
-            }, PRESENTATION_CONFIG.overlayDelayMs);
-            
-            overlayTimersRef.current = [overlayTimer];
-          }
+          // Start fresh video each time ER becomes active
+          startNextVideo(); // Start video immediately
+          
+          // Delay overlay appearance as configured
+          const overlayTimer = setTimeout(() => {
+            if (isHealthcareActiveRef.current) {
+              setShowPresentationOverlay(true);
+              setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
+            }
+          }, PRESENTATION_CONFIG.overlayDelayMs);
+          
+          overlayTimersRef.current = [overlayTimer];
           } else {
           // Cancel overlay if switching away
           overlayTimersRef.current.forEach(t => clearTimeout(t));
