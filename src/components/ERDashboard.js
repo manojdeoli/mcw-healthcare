@@ -217,7 +217,17 @@ const ERDashboard = () => {
     // In iframe: controlled by VIEW_CHANGED messages only
     if (isInIframe) {
       playVideo(`/${currentVideoRef.current}`);
+      
+      // Add video end handler that pauses (like hotel does)
+      const handleVideoEnd = () => {
+        if (videoRef.current) {
+          videoRef.current.pause();
+        }
+      };
+      videoRef.current?.addEventListener('ended', handleVideoEnd);
+      
       return () => {
+        videoRef.current?.removeEventListener('ended', handleVideoEnd);
         delete window.__erPlayVideo;
         if (canPlayHandlerRef.current && videoRef.current) {
           videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
@@ -225,6 +235,7 @@ const ERDashboard = () => {
       };
     }
 
+    // In standalone mode: rotate every 8s
     playVideo(`/${currentVideoRef.current}`);
     const videoRotationTimer = setInterval(() => {
       let newVideo;
