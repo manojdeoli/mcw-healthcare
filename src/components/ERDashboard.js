@@ -677,7 +677,7 @@ const ERDashboard = () => {
       {(!isAttractMode || isInIframe) && (
         <div
           className="monitor-screen"
-          style={isInIframe ? { opacity: showPresentationOverlay ? 1 : 0, transition: 'opacity 1s ease', pointerEvents: 'none' } : undefined}
+          style={isInIframe ? { opacity: showPresentationOverlay ? 0.72 : 0, transition: 'opacity 1.2s ease', pointerEvents: 'none' } : undefined}
         >
           <div className="monitor-content">
             <div className="er-content">

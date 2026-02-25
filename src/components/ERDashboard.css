@@ -59,7 +59,7 @@
   transform: translateX(-50%) perspective(1000px) rotateX(-12deg);
   width: clamp(400px, 50vw, 1000px);
   height: clamp(300px, 45vh, 700px);
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.55);
   border-radius: 8px;
   overflow: visible;
   box-shadow: 
@@ -195,21 +195,13 @@
 }
 
 .patient-queue {
-  background: linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(248, 249, 250, 0.55) 0%, rgba(233, 236, 239, 0.45) 100%);
   padding: 0.3rem;
   border-radius: 3px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   overflow: visible;
   height: auto;
-}
-
-.map-panel, .alert-panel {
-  background: linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.9) 100%);
-  padding: 0.3rem;
-  border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 0.2rem;
 }
 
@@ -508,7 +500,7 @@
 }
 
 .map-panel, .resource-panel {
-  background: linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(248, 249, 250, 0.55) 0%, rgba(233, 236, 239, 0.45) 100%);
   padding: 0.1rem;
   border-radius: 3px;
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -540,7 +532,7 @@
 }
 
 .alert-panel {
-  background: linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(248, 249, 250, 0.55) 0%, rgba(233, 236, 239, 0.45) 100%);
   padding: 0.3rem;
   border-radius: 3px;
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -563,7 +555,7 @@
   border-radius: 4px;
   margin-bottom: 0.2rem;
   border: 1px solid rgba(0, 0, 0, 0.2);
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.60);
 }
 
 .alert-item strong {
