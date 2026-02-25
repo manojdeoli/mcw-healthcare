@@ -294,20 +294,7 @@ const ERDashboard = () => {
         if (isActive) {
           videoCountRef.current += 1;
           const videos = ['ER-1.mp4','ER-2.mp4','ER-3.mp4','ER-4.mp4','ER-5.mp4','ER-6.mp4','ER-7.mp4','ER-8.mp4','ER-9.mp4'];
-          const startNextVideo = () => {
-            if (!isHealthcareActiveRef.current) return;
-            let newVideo;
-            do { newVideo = videos[Math.floor(Math.random() * videos.length)]; }
-            while (newVideo === currentVideoRef.current && videos.length > 1);
-            currentVideoRef.current = newVideo;
-            const v = videoRef.current;
-            if (!v) return;
-            v.muted = !audioEnabledRef.current;
-            const onCanPlay = () => { v.removeEventListener('canplay', onCanPlay); if (isHealthcareActiveRef.current) v.play().catch(() => {}); };
-            v.addEventListener('canplay', onCanPlay);
-            v.src = `/${newVideo}`;
-            v.load();
-          };
+          
           // Every activation: delay overlay appearance, start next video immediately,
           // then show overlay with fade-in after configured delay
           const startNextVideo = () => {
