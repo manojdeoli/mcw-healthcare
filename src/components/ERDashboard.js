@@ -280,6 +280,12 @@ const ERDashboard = () => {
           videoCountRef.current += 1;
           const videos = ['ER-1.mp4','ER-2.mp4','ER-3.mp4','ER-4.mp4','ER-5.mp4','ER-6.mp4','ER-7.mp4','ER-8.mp4','ER-9.mp4'];
           
+          // Don't start new video if one is already playing (not ended)
+          if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
+            console.log('🚫 Video already playing, ignoring VIEW_CHANGED');
+            return;
+          }
+          
           // Clear any existing timers first
           overlayTimersRef.current.forEach(t => clearTimeout(t));
           overlayTimersRef.current = [];
@@ -300,30 +306,38 @@ const ERDashboard = () => {
             const onCanPlay = () => { 
               v.removeEventListener('canplay', onCanPlay); 
               if (isHealthcareActiveRef.current) {
+                console.log('🎥 Starting ER video:', newVideo);
                 v.play().catch(() => {});
-                // Add video ended handler for freeze frame
-                const onEnded = () => {
-                  v.removeEventListener('ended', onEnded);
-                  videoEndedRef.current = true;
-                  // Pause video to freeze on last frame
-                  v.pause();
-                  // Hold freeze frame for configured duration
-                  const freezeTimer = setTimeout(() => {
-                    if (isHealthcareActiveRef.current) {
-                      // Hide overlay during transition
-                      setShowPresentationOverlay(false);
-                      // Brief pause before next video
-                      setTimeout(() => {
-                        if (isHealthcareActiveRef.current) {
-                          // Transition to next video after freeze - only if still active
-                          startNextVideo();
-                        }
-                      }, 500);
-                    }
-                  }, PRESENTATION_CONFIG.freezeFrameDurationMs);
-                  overlayTimersRef.current.push(freezeTimer);
-                };
-                v.addEventListener('ended', onEnded);
+                
+                // Start timer for freeze frame (video duration + small buffer)
+                const videoDuration = 8000; // ER videos are ~8 seconds
+                const freezeTimer = setTimeout(() => {
+                  if (isHealthcareActiveRef.current) {
+                    console.log('🎬 Video should be ending, starting freeze frame');
+                    // Pause video to freeze on last frame
+                    v.pause();
+                    console.log('⏸️ Video paused for freeze frame, duration:', PRESENTATION_CONFIG.freezeFrameDurationMs);
+                    
+                    // Hold freeze frame for configured duration
+                    const freezeHoldTimer = setTimeout(() => {
+                      console.log('⏰ Freeze frame timeout completed, transitioning...');
+                      if (isHealthcareActiveRef.current) {
+                        // Hide overlay during transition
+                        setShowPresentationOverlay(false);
+                        // Brief pause before next video
+                        setTimeout(() => {
+                          if (isHealthcareActiveRef.current) {
+                            console.log('🔄 Starting next video after freeze');
+                            // Transition to next video after freeze
+                            startNextVideo();
+                          }
+                        }, 500);
+                      }
+                    }, PRESENTATION_CONFIG.freezeFrameDurationMs);
+                    overlayTimersRef.current.push(freezeHoldTimer);
+                  }
+                }, videoDuration);
+                overlayTimersRef.current.push(freezeTimer);
               }
             };
             v.addEventListener('canplay', onCanPlay);
