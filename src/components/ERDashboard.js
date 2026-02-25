@@ -316,13 +316,20 @@ const ERDashboard = () => {
                 const onEnded = () => {
                   v.removeEventListener('ended', onEnded);
                   videoEndedRef.current = true;
-                  // Freeze on last frame
-                  v.currentTime = v.duration;
+                  // Pause video to freeze on last frame
+                  v.pause();
                   // Hold freeze frame for configured duration
                   const freezeTimer = setTimeout(() => {
                     if (isHealthcareActiveRef.current) {
-                      // Transition to next video after freeze
-                      startNextVideo();
+                      // Hide overlay during transition
+                      setShowPresentationOverlay(false);
+                      // Brief pause before next video
+                      setTimeout(() => {
+                        if (isHealthcareActiveRef.current) {
+                          // Transition to next video after freeze
+                          startNextVideo();
+                        }
+                      }, 500);
                     }
                   }, PRESENTATION_CONFIG.freezeFrameDurationMs);
                   overlayTimersRef.current.push(freezeTimer);
