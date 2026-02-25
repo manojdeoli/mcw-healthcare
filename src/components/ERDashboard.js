@@ -278,10 +278,7 @@ const ERDashboard = () => {
             v.src = `/${newVideo}`;
             v.load();
           };
-          if (videoCountRef.current % 3 !== 0) {
-            startNextVideo();
-          } else {
-            // Every 3rd activation: show overlay, start next video immediately (plays behind overlay),
+          // Every activation: show overlay, start next video immediately (plays behind overlay),
             // then fade out overlay after 6s for smooth transition
             setShowPresentationOverlay(true);
             setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
@@ -291,8 +288,7 @@ const ERDashboard = () => {
               overlayTimersRef.current = [];
             }, 6000);
             overlayTimersRef.current = [t1];
-          }
-        } else {
+          } else {
           // Cancel overlay if switching away
           overlayTimersRef.current.forEach(t => clearTimeout(t));
           overlayTimersRef.current = [];
