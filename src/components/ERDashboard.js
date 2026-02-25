@@ -551,26 +551,23 @@ const ERDashboard = () => {
   return (
     <div className="er-dashboard">
       {/* Background Video - Timer Controlled */}
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        muted 
-        playsInline 
-        preload="auto"
-        onEnded={() => {
-          if (!isInIframe) return;
-          // In iframe mode, VIEW_CHANGED drives the cycle — nothing to do on ended
-        }}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          objectFit: 'cover',
-          zIndex: -1
-        }}
-      />
+      {/* Static background in standalone mode, video in presentation/iframe mode */}
+      {isInIframe ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', objectFit: 'cover', zIndex: -1 }}
+        />
+      ) : (
+        <img
+          src="/ER_Back.png"
+          alt=""
+          style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', objectFit: 'cover', zIndex: -1 }}
+        />
+      )}
       
       
       {/* Audio Toggle Button - shown in standalone (not when embedded in AttractMode iframe) */}
