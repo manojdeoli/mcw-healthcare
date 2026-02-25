@@ -746,7 +746,7 @@ function App() {
     
     // Reset all application state before starting registration
     syncSetRegistrationStatus('Not Registered');
-    syncSetIdentityIntegrity('Bad');
+    // Don't reset Identity Integrity - preserve existing state
     syncSetPatientStatus('Not Checked In');
     syncSetPaymentStatus('Not Paid');
     syncSetGeofencingSubscriptionId(null);
