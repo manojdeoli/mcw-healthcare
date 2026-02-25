@@ -1,21 +1,16 @@
 @echo off
-echo Starting Healthcare Use Case Application...
+echo Starting Healthcare Application...
 echo.
-
-REM Check if node_modules exists
-if not exist "node_modules" (
-    echo Installing dependencies...
-    npm install
-    echo.
-)
-
-REM Start the React application
-echo Launching React application...
-npm start
-
-REM Keep window open if there's an error
-if errorlevel 1 (
-    echo.
-    echo Error occurred. Press any key to exit...
-    pause >nul
-)
+echo Stopping any existing process on port 3003...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3003') do taskkill /F /PID %%a >nul 2>&1
+echo.
+echo Installing dependencies...
+call npm install
+echo.
+echo Starting server on port 3003...
+echo Opening browser...
+echo.
+set NODE_ENV=production
+start http://localhost:3003
+node server.js
+pause
