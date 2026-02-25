@@ -570,36 +570,6 @@ const ERDashboard = () => {
       )}
       
       
-      {/* Audio Toggle Button - shown in standalone (not when embedded in AttractMode iframe) */}
-      {!isInIframe && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleAudio();
-          }}
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '100px',
-            background: 'rgba(0, 0, 0, 0.7)',
-            color: 'white',
-            border: '2px solid #007bff',
-            borderRadius: '50%',
-            width: '50px',
-            height: '50px',
-            fontSize: '20px',
-            cursor: 'pointer',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-          }}
-          title={audioEnabled ? "Mute Sound" : "Enable Sound"}
-        >
-          {audioEnabled ? '🔇' : '🔊'}
-        </button>
-      )}
       
       {/* Attribution Button */}
       <button
