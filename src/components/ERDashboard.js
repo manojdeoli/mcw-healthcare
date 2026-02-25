@@ -214,27 +214,10 @@ const ERDashboard = () => {
     // Expose playVideo for VIEW_CHANGED handler
     window.__erPlayVideo = playVideo;
 
-    // In iframe: no internal timer — VIEW_CHANGED controls when to start a new video
-    // In standalone: rotate every 8s
+    // In iframe: controlled by VIEW_CHANGED messages only
     if (isInIframe) {
       playVideo(`/${currentVideoRef.current}`);
-
-      // Brief black pause (1.5s) between videos so the end of each clip is perceptible
-      const handleEnded = () => {
-        if (!isHealthcareActiveRef.current) return;
-        setTimeout(() => {
-          if (!isHealthcareActiveRef.current) return;
-          let newVideo;
-          do { newVideo = videos[Math.floor(Math.random() * videos.length)]; }
-          while (newVideo === currentVideoRef.current && videos.length > 1);
-          currentVideoRef.current = newVideo;
-          playVideo(`/${newVideo}`);
-        }, 1500);
-      };
-      videoRef.current?.addEventListener('ended', handleEnded);
-
       return () => {
-        videoRef.current?.removeEventListener('ended', handleEnded);
         delete window.__erPlayVideo;
         if (canPlayHandlerRef.current && videoRef.current) {
           videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
