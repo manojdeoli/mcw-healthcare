@@ -303,7 +303,7 @@ function App() {
   const authCheckExecuted = useRef(false);
   const [activeScreen, setActiveScreen] = useState(() => {
     const saved = localStorage.getItem('activeScreen');
-    return saved ? parseInt(saved) : 1;
+    return saved ? parseInt(saved) : 3;
   });
   const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState(() => {
     const stored = localStorage.getItem('verifiedPhoneNumber');
