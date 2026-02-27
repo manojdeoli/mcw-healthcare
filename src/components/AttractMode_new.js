@@ -6,7 +6,7 @@ const SEQUENCE_CONFIG = {
   HEALTHCARE_SLIDE_DURATION: 5000, // 5 seconds
   HOTEL_SLIDE_DURATION: 5000, // 5 seconds
   WIPRO_LOGO_DURATION: 2000, // 2 seconds
-  FADE_DURATION: 200 // Reduced to 0.2 seconds for faster transitions
+  FADE_DURATION: 1200 // 1.2 seconds for transitions
 };
 
 // Presentation sequence steps
@@ -25,36 +25,19 @@ const AttractMode = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isShowingSlide, setIsShowingSlide] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(null);
+  const [slideExiting, setSlideExiting] = useState(false);
+  const [videoTransitioning, setVideoTransitioning] = useState(false);
   const [hotelKioskAvailable, setHotelKioskAvailable] = useState(false);
   const [hotelPort, setHotelPort] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [erSoundEnabled, setErSoundEnabled] = useState(false);
   const [hotelSoundEnabled, setHotelSoundEnabled] = useState(false);
-  const [isFrozen, setIsFrozen] = useState(false);
-  const [erVideo1, setErVideo1] = useState(null);
-  const [erVideo2, setErVideo2] = useState(null);
-  const [videoIndex, setVideoIndex] = useState(0);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const iframeRefs = useRef([]);
   const stepTimerRef = useRef(null);
   const currentStepRef = useRef(0);
-  const frozenRef = useRef(false);
   const hotelKioskAvailableRef = useRef(false);
   const hotelPortRef = useRef(null);
-
-  // Initialize different videos for VIDEO_1 and VIDEO_2 with proper rotation
-  useEffect(() => {
-    const videos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
-    const video1 = videos[videoIndex % videos.length];
-    const video2 = videos[(videoIndex + 1) % videos.length];
-    setErVideo1(video1);
-    setErVideo2(video2);
-    console.log('🎥 AttractMode: Selected ER videos - Video1:', video1, 'Video2:', video2);
-  }, [videoIndex]);
-
-  // Rotate videos after each complete cycle
-  const rotateVideos = () => {
-    setVideoIndex(prev => (prev + 2) % 9); // Move by 2 to get next pair
-  };
 
   // Get current sequence step
   const getCurrentStep = () => SEQUENCE_STEPS[currentStep];
@@ -89,43 +72,55 @@ const AttractMode = () => {
 
   // Move to next step in sequence
   const nextStep = () => {
-    console.log('🔄 AttractMode: Moving from step', currentStep, 'to next step');
+    console.log('🔄 AttractMode: nextStep() called - current step:', currentStep);
     setCurrentStep(prev => {
       const next = (prev + 1) % SEQUENCE_STEPS.length;
+      console.log('🔄 AttractMode: Moving from step', prev, 'to step', next, '- Step type:', SEQUENCE_STEPS[next]?.type);
       currentStepRef.current = next;
-      
-      // Rotate videos when completing a full cycle (back to step 0)
-      if (next === 0) {
-        rotateVideos();
-      }
-      
-      console.log('🎯 AttractMode: Next step is', next, ':', SEQUENCE_STEPS[next].type);
       return next;
     });
   };
 
-  // Handle slide display with seamless crossfade to eliminate flicker
+  // Handle slide display
   const showSlide = (slideType, duration) => {
-    console.log('🖼️ AttractMode: Showing slide:', slideType, 'duration:', duration);
-    
-    // Show slide immediately without fading iframe first
+    console.log('🖼️ AttractMode: showSlide called with slideType:', slideType, 'duration:', duration);
+    setSlideExiting(false);
     setIsShowingSlide(true);
     setCurrentSlide(slideType);
+    console.log('🖼️ AttractMode: currentSlide set to:', slideType);
     
-    // Schedule slide end
     stepTimerRef.current = setTimeout(() => {
-      console.log('➡️ AttractMode: Moving to next step');
-      setIsShowingSlide(false);
-      setCurrentSlide(null);
-      nextStep();
-    }, duration);
+      // Start exit animation
+      setSlideExiting(true);
+      
+      // Wait for exit animation to complete before moving to next step
+      setTimeout(() => {
+        setIsShowingSlide(false);
+        setCurrentSlide(null);
+        setSlideExiting(false);
+        nextStep();
+      }, SEQUENCE_CONFIG.FADE_DURATION);
+    }, duration - SEQUENCE_CONFIG.FADE_DURATION);
   };
 
   // Handle video completion
   const handleVideoComplete = () => {
+    console.log('🎬 AttractMode: handleVideoComplete() called - stepTimerRef.current:', !!stepTimerRef.current);
+    
     if (stepTimerRef.current) {
+      console.log('🎬 AttractMode: Clearing existing stepTimer');
       clearTimeout(stepTimerRef.current);
     }
+    
+    console.log('🎬 AttractMode: Video completed, proceeding to next step');
+    
+    // Clear any existing timeout to prevent race conditions
+    if (stepTimerRef.current) {
+      console.log('🎬 AttractMode: Double-clearing stepTimer for safety');
+      clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+    
     nextStep();
   };
 
@@ -160,50 +155,65 @@ const AttractMode = () => {
   // Main sequence controller
   useEffect(() => {
     const step = getCurrentStep();
+    console.log('🎬 AttractMode: Main sequence controller triggered - currentStep:', currentStep, 'stepType:', step.type);
     
     if (step.type.includes('SLIDE') || step.type === 'WIPRO_LOGO') {
+      console.log('🖼️ AttractMode: Showing slide:', step.type, 'duration:', step.duration);
       // Show static slide
       showSlide(step.type, step.duration);
     } else if (step.type.includes('VIDEO')) {
-      // Show video iframe
+      console.log('🎥 AttractMode: Starting video step:', step.type, 'target:', step.target);
+      // Show video iframe with transition
       setIsShowingSlide(false);
       setCurrentSlide(null);
       
-      // Broadcast to iframe
       const activeTarget = step.target;
       const activeView = step.target === 'hotel' ? 1 : 0;
+      const videoNumber = step.type.includes('VIDEO_1') ? 1 : 2;
       
-      console.log('🎥 AttractMode: Starting', step.type, 'for', activeTarget, 'at', new Date().toLocaleTimeString());
+      console.log('🎥 AttractMode: Video details - activeTarget:', activeTarget, 'activeView:', activeView, 'videoNumber:', videoNumber);
       
-      broadcast({ 
-        type: 'VIEW_CHANGED', 
-        activeView, 
-        activeTarget,
-        videoNumber: step.type.includes('VIDEO_1') ? 1 : 2,
-        specificVideo: activeTarget === 'er' ? (step.type.includes('VIDEO_1') ? erVideo1 : erVideo2) : undefined
+      // Start video transition
+      setVideoTransitioning(true);
+      console.log('🎥 AttractMode: Video transition started');
+      
+      // Get next video in rotation
+      const erVideos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
+      const selectedVideo = erVideos[currentVideoIndex];
+      console.log('🎥 AttractMode: Selected video:', selectedVideo, 'currentVideoIndex:', currentVideoIndex);
+      
+      // Update video index for next time
+      setCurrentVideoIndex(prev => {
+        const next = (prev + 1) % erVideos.length;
+        console.log('🎥 AttractMode: Updated video index from', prev, 'to', next);
+        return next;
       });
       
-      // Send activation message again after a short delay to ensure iframe is ready
+      // Wait for transition, then broadcast to iframe
       setTimeout(() => {
-        console.log('🎥 AttractMode: Delayed activation for', step.type);
+        console.log('📡 AttractMode: Broadcasting VIEW_CHANGED message');
         broadcast({ 
           type: 'VIEW_CHANGED', 
           activeView, 
           activeTarget,
-          videoNumber: step.type.includes('VIDEO_1') ? 1 : 2,
-          specificVideo: activeTarget === 'er' ? (step.type.includes('VIDEO_1') ? erVideo1 : erVideo2) : undefined
+          videoNumber,
+          specificVideo: selectedVideo
         });
-      }, 100);
+        
+        // End transition
+        setTimeout(() => {
+          console.log('🎥 AttractMode: Video transition ended');
+          setVideoTransitioning(false);
+        }, 600);
+      }, 300);
       
-      // FIXED: Use exact 8 second duration for all videos
-      stepTimerRef.current = setTimeout(() => {
-        console.log('🎥 AttractMode: EXACTLY 8 seconds completed for', step.type, 'at', new Date().toLocaleTimeString());
-        handleVideoComplete();
-      }, 8000);
+      // No timeout - wait for VIDEO_ENDED message from iframe
+      console.log('🎥 AttractMode: Waiting for VIDEO_ENDED message from iframe');
     }
     
     return () => {
       if (stepTimerRef.current) {
+        console.log('🧽 AttractMode: Cleanup - clearing stepTimer');
         clearTimeout(stepTimerRef.current);
       }
     };
@@ -214,12 +224,16 @@ const AttractMode = () => {
     const timer = setTimeout(() => {
       const step = getCurrentStep();
       if (step.type.includes('VIDEO')) {
-        console.log('🎥 AttractMode: Initial broadcast for', step.type, 'at', new Date().toLocaleTimeString());
+        const erVideos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
+        const selectedVideo = erVideos[currentVideoIndex];
+        setCurrentVideoIndex(prev => (prev + 1) % erVideos.length);
+        
         broadcast({ 
           type: 'VIEW_CHANGED', 
           activeView: step.target === 'hotel' ? 1 : 0, 
           activeTarget: step.target,
-          videoNumber: 1
+          videoNumber: 1,
+          specificVideo: selectedVideo
         });
       }
     }, 500);
@@ -229,7 +243,10 @@ const AttractMode = () => {
   // Handle messages from iframes
   useEffect(() => {
     const handler = (event) => {
+      console.log('📨 AttractMode: Received message:', event.data);
+      
       if (event.data?.type === 'TRY_NOW') {
+        console.log('📨 AttractMode: Handling TRY_NOW message');
         const close = async () => {
           try { if (document.fullscreenElement) await document.exitFullscreen(); } catch {}
           if (window.opener) {
@@ -240,18 +257,32 @@ const AttractMode = () => {
           }
         };
         close();
-      } else if (event.data?.type === 'FREEZE_START') {
-        console.log('❄️ AttractMode: FREEZE_START received - pausing sequence');
-        setIsFrozen(true);
-        frozenRef.current = true;
-      } else if (event.data?.type === 'FREEZE_END') {
-        console.log('🔓 AttractMode: FREEZE_END received - resuming sequence');
-        setIsFrozen(false);
-        frozenRef.current = false;
+      } else if (event.data?.type === 'VIDEO_ENDED') {
+        console.log('📺 AttractMode: Received VIDEO_ENDED from iframe');
+        
+        // Only handle if we're currently showing a video step and not already transitioning
+        const currentStep = SEQUENCE_STEPS[currentStepRef.current];
+        const isVideoStep = currentStep?.type.includes('VIDEO');
+        const isAlreadyTransitioning = !!stepTimerRef.current;
+        
+        console.log('📺 AttractMode: VIDEO_ENDED check - currentStep:', currentStepRef.current, 'stepType:', currentStep?.type, 'isVideoStep:', isVideoStep, 'isAlreadyTransitioning:', isAlreadyTransitioning);
+        
+        if (isVideoStep && !isAlreadyTransitioning) {
+          console.log('📺 AttractMode: Processing VIDEO_ENDED - calling handleVideoComplete()');
+          handleVideoComplete();
+        } else {
+          console.log('📺 AttractMode: Ignoring VIDEO_ENDED - not video step or already transitioning');
+        }
       }
     };
+    
+    console.log('📨 AttractMode: Setting up message listener');
     window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    
+    return () => {
+      console.log('📨 AttractMode: Cleaning up message listener');
+      window.removeEventListener('message', handler);
+    };
   }, []);
 
   // Handle exit on ESC key
@@ -278,7 +309,6 @@ const AttractMode = () => {
     e.stopPropagation();
     setErSoundEnabled(prev => {
       const next = !prev;
-      console.log('🔊 AttractMode: Toggling ER sound from', prev, 'to', next);
       broadcast({ type: 'SOUND_TOGGLE', target: 'er', enabled: next });
       return next;
     });
@@ -288,7 +318,6 @@ const AttractMode = () => {
     e.stopPropagation();
     setHotelSoundEnabled(prev => {
       const next = !prev;
-      console.log('🔊 AttractMode: Toggling Hotel sound from', prev, 'to', next);
       broadcast({ type: 'SOUND_TOGGLE', target: 'hotel', enabled: next });
       return next;
     });
@@ -322,50 +351,50 @@ const AttractMode = () => {
 
   return (
     <div className="attract-mode">
-      {/* Slide Display - Higher z-index for seamless transition */}
+      {/* Slide Display */}
       {isShowingSlide && (
-        <div className="slide-container" style={{
+        <div className={`slide-container ${slideExiting ? 'slide-out' : ''}`} style={{
           position: 'fixed',
           top: 0,
           left: 0,
           width: '100vw',
           height: '100vh',
-          backgroundColor: '#000',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 2000, // Higher than iframe to cover seamlessly
-          opacity: 1
+          zIndex: 1000
         }}>
           <img
-            src={currentSlide === 'WIPRO_LOGO' ? '/wipro-logo.png' : 
-                 currentSlide === 'HOTEL_SLIDE' ? '/AdunaSlideforDemo.png' : 
-                 '/NokiaSlideforDemo.png'}
+            src={(() => {
+              console.log('🖼️ AttractMode: Rendering slide with currentSlide:', currentSlide);
+              if (currentSlide === 'WIPRO_LOGO') {
+                console.log('🖼️ AttractMode: Showing Wipro Logo');
+                return '/Wipro-Logo.png?v=1';
+              } else if (currentSlide === 'HOTEL_SLIDE') {
+                console.log('🖼️ AttractMode: Showing Aduna Slide');
+                return '/AdunaSlideforDemo.png?v=1';
+              } else {
+                console.log('🖼️ AttractMode: Showing Nokia Healthcare Slide');
+                return '/NokiaSlideforDemo.png?v=1';
+              }
+            })()
+            }
             alt={currentSlide === 'WIPRO_LOGO' ? 'Wipro Logo' : 
                  currentSlide === 'HOTEL_SLIDE' ? 'Aduna Demo Slide' : 
                  'Nokia Healthcare Slide'}
             style={{
               maxWidth: '100vw',
               maxHeight: '100vh',
-              objectFit: 'contain',
-              opacity: 1
+              objectFit: 'contain'
             }}
           />
         </div>
       )}
       
-      {/* Iframe Content - ALWAYS RENDERED to prevent audio state loss */}
-      <div className="attract-container" style={{
-        opacity: shouldShowIframe ? 1 : 0,
-        transition: 'opacity 200ms ease-in-out',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        zIndex: isShowingSlide ? -1 : 1, // Hide behind slides but keep rendered
-        pointerEvents: isShowingSlide ? 'none' : 'auto'
-      }}>
+      {/* Iframe Content */}
+      {shouldShowIframe && (
+        <div className="attract-container">
+          <div className={`video-transition-overlay ${videoTransitioning ? 'transitioning' : ''}`}></div>
           {(() => {
             const views = getViews();
             return hotelKioskAvailable ? (
@@ -378,11 +407,6 @@ const AttractMode = () => {
                   title={view.name}
                   allow="autoplay"
                   frameBorder="0"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none'
-                  }}
                 />
               ))
             ) : (
@@ -394,14 +418,10 @@ const AttractMode = () => {
                 title={views[0].name}
                 allow="autoplay"
                 frameBorder="0"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none'
-                }}
               />
             );
-          })()}
+          })()
+          )}
         </div>
       )}
       
@@ -409,60 +429,60 @@ const AttractMode = () => {
         <div className="click-overlay" onClick={exitAttractMode}></div>
       )}
       
-      {/* Sound buttons - always visible */}
-      <button
-        onClick={toggleErSound}
-        style={{
-          position: 'fixed',
-          top: '20px',
-          right: '160px',
-          background: erSoundEnabled ? '#28a745' : 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          border: '2px solid #007bff',
-          borderRadius: '20px',
-          padding: '6px 12px',
-          fontSize: '14px',
-          cursor: 'pointer',
-          zIndex: 10002,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-        }}
-        title="Toggle Healthcare ER sound"
-      >
-        {erSoundEnabled ? '🔊' : '🔇'} <span style={{ fontSize: '11px' }}>ER Sound</span>
-      </button>
-      {hotelKioskAvailable && (
-        <button
-          onClick={toggleHotelSound}
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '290px',
-            background: hotelSoundEnabled ? '#28a745' : 'rgba(0, 0, 0, 0.7)',
-            color: 'white',
-            border: '2px solid #e80074',
-            borderRadius: '20px',
-            padding: '6px 12px',
-            fontSize: '14px',
-            cursor: 'pointer',
-            zIndex: 10002,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-          }}
-          title="Toggle Hotel sound"
-        >
-          {hotelSoundEnabled ? '🔊' : '🔇'} <span style={{ fontSize: '11px' }}>Hotel Sound</span>
-        </button>
-      )}
-      
       {!isFullscreen && (
-        <button className="fullscreen-button" onClick={enterFullscreen}>
-          Fullscreen Mode
-        </button>
+        <>
+          <button className="fullscreen-button" onClick={enterFullscreen}>
+            Fullscreen Mode
+          </button>
+          <button
+            onClick={toggleErSound}
+            style={{
+              position: 'fixed',
+              top: '20px',
+              right: '160px',
+              background: erSoundEnabled ? '#28a745' : 'rgba(0, 0, 0, 0.7)',
+              color: 'white',
+              border: '2px solid #007bff',
+              borderRadius: '20px',
+              padding: '6px 12px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              zIndex: 10002,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+            }}
+            title="Toggle Healthcare ER sound"
+          >
+            {erSoundEnabled ? '🔊' : '🔇'} <span style={{ fontSize: '11px' }}>ER Sound</span>
+          </button>
+          {hotelKioskAvailable && (
+            <button
+              onClick={toggleHotelSound}
+              style={{
+                position: 'fixed',
+                top: '20px',
+                right: '290px',
+                background: hotelSoundEnabled ? '#28a745' : 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                border: '2px solid #e80074',
+                borderRadius: '20px',
+                padding: '6px 12px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                zIndex: 10002,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+              }}
+              title="Toggle Hotel sound"
+            >
+              {hotelSoundEnabled ? '🔊' : '🔇'} <span style={{ fontSize: '11px' }}>Hotel Sound</span>
+            </button>
+          )}
+        </>
       )}
     </div>
   );

@@ -13,9 +13,8 @@ const MAP_CENTER = { lat: 41.38697, lng: 2.1182 };
 const getPresentationConfig = () => {
   const params = new URLSearchParams(window.location.search);
   return {
-    overlayDelayMs: parseInt(params.get('overlayDelay')) || 5000,
+    overlayDelayMs: parseInt(params.get('overlayDelay')) || 4000,
     overlayFadeInMs: parseInt(params.get('fadeIn')) || 1200,
-    freezeFrameDurationMs: parseInt(params.get('freezeDuration')) || 3500,
     overlayPersistent: params.get('persistent') !== 'false'
   };
 };
@@ -125,28 +124,34 @@ const ERDashboard = () => {
   const mapInstanceRef = useRef(null);
   const channelRef = useRef(null);
   const videoRef = useRef(null);
-  const currentVideoRef = useRef(null); // ref to track current video without stale closure
-  const audioEnabledRef = useRef(false); // ref to avoid stale closure in BroadcastChannel handler
-  const isHealthcareActiveRef = useRef(true); // ref to check active state inside playVideo closure
-  const [backgroundVideo, setBackgroundVideo] = useState(() => {
-    const videos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
-    const initial = videos[Math.floor(Math.random() * videos.length)];
-    currentVideoRef.current = initial;
-    return initial;
-  });
-  const [nextVideo, setNextVideo] = useState(null);
-  const [showAttribution, setShowAttribution] = useState(false);
+  const audioEnabledRef = useRef(false);
+  const isHealthcareActiveRef = useRef(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
-  const [showAudioPrompt, setShowAudioPrompt] = useState(true);
   const [isHealthcareActive, setIsHealthcareActive] = useState(true);
-  const [showPresentationOverlay, setShowPresentationOverlay] = useState(false);
-  const videoCountRef = useRef(0);
-  const overlayTimersRef = useRef([]);
-  const videoEndedRef = useRef(false);
-
   // Only hide dashboard overlay in attract mode OR when inside iframe (for AttractMode)
   const isInIframe = window !== window.top;
   const isAttractMode = window.location.hash === '#/attract-mode' || isInIframe;
+
+  // Initialize audio state from localStorage on mount
+  useEffect(() => {
+    if (isAttractMode) {
+      // Always start with ER audio disabled by default
+      console.log('🎵 ERDashboard: Setting ER audio to disabled by default');
+      audioEnabledRef.current = false;
+      setAudioEnabled(false);
+      localStorage.setItem('er_audio_enabled', 'false');
+    }
+  }, [isAttractMode]);
+
+  // Save audio state to localStorage whenever it changes
+  useEffect(() => {
+    if (isAttractMode) {
+      localStorage.setItem('er_audio_enabled', audioEnabledRef.current.toString());
+      console.log('🎵 ERDashboard: Saved audio state to localStorage:', audioEnabledRef.current);
+    }
+  }, [audioEnabled, isAttractMode]);
+
+  const [showPresentationOverlay, setShowPresentationOverlay] = useState(false);
 
   // Sort patients: real patient (Joe Bloggs) always first, then rotate mock patients
   const realPatient = patients.find(p => !p.phoneNumber.startsWith('mock-'));
@@ -154,11 +159,16 @@ const ERDashboard = () => {
   
   const sortedPatients = realPatient ? [realPatient, ...mockPatients] : mockPatients;
 
-  // Patient rotation timer - only rotate mock patients (skip index 0 if real patient exists)
+  // Patient rotation timer - DISABLED during video playback to prevent audio interruption
   useEffect(() => {
     if (sortedPatients.length <= 1) return;
     
     const rotationTimer = setInterval(() => {
+      const v = videoRef.current;
+      // Skip rotation if video is playing to prevent audio interruption
+      if (v && !v.paused && isHealthcareActiveRef.current) {
+        return;
+      }
       setCurrentPatientIndex(prev => {
         const nextIndex = prev + 1;
         // If we have a real patient, rotate only through mock patients (indices 1+)
@@ -179,235 +189,225 @@ const ERDashboard = () => {
     }
   }, [sortedPatients.length, currentPatientIndex, realPatient]);
 
-  // Real-time clock
+  // Real-time clock - DISABLED during video playback to prevent audio interruption
   useEffect(() => {
     const timer = setInterval(() => {
+      const v = videoRef.current;
+      // Skip clock update if video is playing to prevent audio interruption
+      if (v && !v.paused && isHealthcareActiveRef.current) {
+        return;
+      }
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Video rotation
+  // Simple video setup for iframe mode
   useEffect(() => {
+    if (!isInIframe || !videoRef.current) return;
+    
     const videos = ['ER-1.mp4', 'ER-2.mp4', 'ER-3.mp4', 'ER-4.mp4', 'ER-5.mp4', 'ER-6.mp4', 'ER-7.mp4', 'ER-8.mp4', 'ER-9.mp4'];
-    const canPlayHandlerRef = { current: null };
-
-    const playVideo = (src) => {
-      if (!videoRef.current) return;
-      if (canPlayHandlerRef.current) {
-        videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
-        canPlayHandlerRef.current = null;
-      }
-      const handler = () => {
-        videoRef.current?.removeEventListener('canplay', handler);
-        canPlayHandlerRef.current = null;
-        if (!isHealthcareActiveRef.current) return;
-        videoRef.current.muted = !audioEnabledRef.current;
-        videoRef.current?.play().catch(() => {});
-      };
-      canPlayHandlerRef.current = handler;
-      videoRef.current.addEventListener('canplay', handler);
-      videoRef.current.src = src;
-      videoRef.current.load();
+    const initial = videos[Math.floor(Math.random() * videos.length)];
+    
+    videoRef.current.src = `/${initial}`;
+    // Always start muted - audio will be enabled only when ER is active
+    videoRef.current.muted = true;
+    videoRef.current.volume = 0;
+    videoRef.current.load();
+    
+    // Add video ended event listener
+    const handleVideoEnd = () => {
+      console.log('📺 ERDashboard: Video ended event fired - notifying parent');
+      console.log('📺 ERDashboard: Video details - src:', videoRef.current?.src, 'currentTime:', videoRef.current?.currentTime, 'duration:', videoRef.current?.duration);
+      window.parent.postMessage({ type: 'VIDEO_ENDED' }, '*');
     };
-
-    // Expose playVideo for VIEW_CHANGED handler
-    window.__erPlayVideo = playVideo;
-
-    // In iframe: controlled by VIEW_CHANGED messages only
-    if (isInIframe) {
-      playVideo(`/${currentVideoRef.current}`);
-      
-      return () => {
-        delete window.__erPlayVideo;
-        if (canPlayHandlerRef.current && videoRef.current) {
-          videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
-        }
-      };
-    }
-
-    // In standalone mode: rotate every 8s
-    playVideo(`/${currentVideoRef.current}`);
-    const videoRotationTimer = setInterval(() => {
-      let newVideo;
-      do {
-        newVideo = videos[Math.floor(Math.random() * videos.length)];
-      } while (newVideo === currentVideoRef.current && videos.length > 1);
-      currentVideoRef.current = newVideo;
-      playVideo(`/${newVideo}`);
-    }, 8000);
-
+    
+    videoRef.current.addEventListener('ended', handleVideoEnd);
+    
+    console.log('🎵 ERDashboard: Initial video setup - starting muted');
+    
     return () => {
-      clearInterval(videoRotationTimer);
-      delete window.__erPlayVideo;
-      if (canPlayHandlerRef.current && videoRef.current) {
-        videoRef.current.removeEventListener('canplay', canPlayHandlerRef.current);
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('ended', handleVideoEnd);
       }
     };
   }, [isInIframe]);
-  // Watchdog: resume video if browser suspends/stalls it while this view is active
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const resume = () => {
-      if (isHealthcareActiveRef.current && video.paused && !video.ended && !overlayTimersRef.current.length) {
-        video.play().catch(() => {});
-      }
-    };
-    video.addEventListener('stalled', resume);
-    video.addEventListener('suspend', resume);
-    video.addEventListener('waiting', resume);
-    return () => {
-      video.removeEventListener('stalled', resume);
-      video.removeEventListener('suspend', resume);
-      video.removeEventListener('waiting', resume);
-    };
-  }, []);
-  // Audio control for attract mode - handleAudioMessage defined inside effect to avoid stale closure
+  // Audio control for attract mode - STABLE VERSION
   useEffect(() => {
     if (!isAttractMode) return;
+    console.log('🎵 ERDashboard: Setting up STABLE message listeners');
+    console.log('🎵 ERDashboard: isAttractMode:', isAttractMode, 'isInIframe:', isInIframe);
 
-    const handleAudioMessage = (data) => {
-    const { type, activeView } = data;
-    if (type === 'PAUSE_ALL') {
-      if (videoRef.current) { videoRef.current.pause(); videoRef.current.muted = true; }
-    } else if (type === 'VIEW_CHANGED') {
-      const isActive = data.activeTarget ? data.activeTarget === 'er' : activeView === 0;
-      setIsHealthcareActive(isActive);
-      isHealthcareActiveRef.current = isActive;
-      if (videoRef.current) {
-        if (isActive) {
-          videoCountRef.current += 1;
+    const handleMessage = (data) => {
+      console.log('🎵 ERDashboard: Received message:', data);
+      
+      if (data.type === 'VIEW_CHANGED') {
+        const isActive = data.activeTarget === 'er';
+        console.log('🎵 ERDashboard: VIEW_CHANGED - isActive:', isActive, 'current audioEnabled:', audioEnabledRef.current, 'specificVideo:', data.specificVideo);
+        
+        setIsHealthcareActive(isActive);
+        isHealthcareActiveRef.current = isActive;
+        
+        if (isActive && videoRef.current) {
           const videos = ['ER-1.mp4','ER-2.mp4','ER-3.mp4','ER-4.mp4','ER-5.mp4','ER-6.mp4','ER-7.mp4','ER-8.mp4','ER-9.mp4'];
+          const selectedVideo = data.specificVideo || videos[Math.floor(Math.random() * videos.length)];
           
-          // Don't start new video if one is already playing (not ended)
-          if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
-            console.log('🚫 Video already playing, ignoring VIEW_CHANGED');
-            return;
-          }
+          console.log('🎵 ERDashboard: Loading video:', selectedVideo, 'with audio:', audioEnabledRef.current);
           
-          // Clear any existing timers first
-          overlayTimersRef.current.forEach(t => clearTimeout(t));
-          overlayTimersRef.current = [];
+          // Preserve current audio state during video change
+          const currentAudioState = audioEnabledRef.current;
           
-          // Every activation: delay overlay appearance, start next video immediately,
-          // then show overlay with fade-in after configured delay
-          const startNextVideo = () => {
-            if (!isHealthcareActiveRef.current) return;
-            let newVideo;
-            do { newVideo = videos[Math.floor(Math.random() * videos.length)]; }
-            while (newVideo === currentVideoRef.current && videos.length > 1);
-            currentVideoRef.current = newVideo;
-            const v = videoRef.current;
-            if (!v) return;
-            v.muted = !audioEnabledRef.current;
-            videoEndedRef.current = false;
-            
-            const onCanPlay = () => { 
-              v.removeEventListener('canplay', onCanPlay); 
-              if (isHealthcareActiveRef.current) {
-                console.log('🎥 Starting ER video:', newVideo);
-                v.play().catch(() => {});
-                
-                // Start timer for freeze frame (video duration + small buffer)
-                const videoDuration = 8000; // ER videos are ~8 seconds
-                const freezeTimer = setTimeout(() => {
-                  if (isHealthcareActiveRef.current) {
-                    console.log('🎬 Video should be ending, starting freeze frame');
-                    // Pause video to freeze on last frame
-                    v.pause();
-                    console.log('⏸️ Video paused for freeze frame, duration:', PRESENTATION_CONFIG.freezeFrameDurationMs);
-                    
-                    // Hold freeze frame for configured duration
-                    const freezeHoldTimer = setTimeout(() => {
-                      console.log('⏰ Freeze frame timeout completed, transitioning...');
-                      if (isHealthcareActiveRef.current) {
-                        // Hide overlay during transition
-                        setShowPresentationOverlay(false);
-                        // Brief pause before next video
-                        setTimeout(() => {
-                          if (isHealthcareActiveRef.current) {
-                            console.log('🔄 Starting next video after freeze');
-                            // Transition to next video after freeze
-                            startNextVideo();
-                          }
-                        }, 500);
-                      }
-                    }, PRESENTATION_CONFIG.freezeFrameDurationMs);
-                    overlayTimersRef.current.push(freezeHoldTimer);
-                  }
-                }, videoDuration);
-                overlayTimersRef.current.push(freezeTimer);
-              }
-            };
-            v.addEventListener('canplay', onCanPlay);
-            v.src = `/${newVideo}`;
-            v.load();
-          };
+          videoRef.current.src = `/${selectedVideo}`;
+          videoRef.current.muted = !currentAudioState;
+          videoRef.current.volume = currentAudioState ? 1.0 : 0;
+          videoRef.current.currentTime = 0;
           
-          // Start fresh video each time ER becomes active
-          startNextVideo(); // Start video immediately
+          console.log('🎵 ERDashboard: Video setup complete - src:', videoRef.current.src, 'muted:', videoRef.current.muted, 'volume:', videoRef.current.volume);
           
-          // Delay overlay appearance as configured
-          const overlayTimer = setTimeout(() => {
+          videoRef.current.load();
+          
+          videoRef.current.addEventListener('canplay', () => {
+            console.log('🎵 ERDashboard: Video canplay event - setting audio state:', audioEnabledRef.current);
+            // Ensure audio state is maintained after video loads
+            videoRef.current.muted = !audioEnabledRef.current;
+            videoRef.current.volume = audioEnabledRef.current ? 1.0 : 0;
+            console.log('🎵 ERDashboard: Starting video playback');
+            videoRef.current.play().catch((error) => {
+              console.error('🎵 ERDashboard: Video play failed:', error);
+            });
+          }, { once: true });
+          
+          setTimeout(() => {
             if (isHealthcareActiveRef.current) {
+              console.log('🎵 ERDashboard: Showing presentation overlay after 4s delay');
               setShowPresentationOverlay(true);
-              setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 100);
             }
-          }, PRESENTATION_CONFIG.overlayDelayMs);
-          
-          overlayTimersRef.current = [overlayTimer];
-          } else {
-          // Cancel overlay if switching away
-          overlayTimersRef.current.forEach(t => clearTimeout(t));
-          overlayTimersRef.current = [];
+          }, 4000);
+        } else {
+          console.log('🎵 ERDashboard: Hiding presentation overlay (not ER or no video)');
+          // CRITICAL: Mute video when not active to prevent background audio
+          if (videoRef.current) {
+            console.log('🎵 ERDashboard: Muting and pausing video because ER is not active');
+            videoRef.current.muted = true;
+            videoRef.current.volume = 0;
+            videoRef.current.pause();
+          }
           setShowPresentationOverlay(false);
-          videoRef.current.muted = true;
-          videoRef.current.pause();
+        }
+      } else if (data.type === 'SOUND_TOGGLE' && data.target === 'er') {
+        const newState = data.enabled;
+        console.log('🎵 ERDashboard: SOUND_TOGGLE for ER - newState:', newState);
+        
+        audioEnabledRef.current = newState;
+        setAudioEnabled(newState);
+        
+        // Immediately save to localStorage
+        localStorage.setItem('er_audio_enabled', newState.toString());
+        console.log('🎵 ERDashboard: Immediately saved audio state to localStorage:', newState);
+        
+        if (videoRef.current) {
+          console.log('🎵 ERDashboard: Applying audio state to video - muted:', !newState, 'volume:', newState ? 1.0 : 0);
+          videoRef.current.muted = !newState;
+          videoRef.current.volume = newState ? 1.0 : 0;
         }
       }
-    } else if (type === 'SOUND_TOGGLE') {
-      if (data.target && data.target !== 'er') return;
-      const newState = data.hasOwnProperty('enabled') ? data.enabled : !audioEnabledRef.current;
-      audioEnabledRef.current = newState;
-      setAudioEnabled(newState);
-      if (videoRef.current) {
-        // Only unmute if ER is the currently active view; always allow muting
-        videoRef.current.muted = !newState || !isHealthcareActiveRef.current;
-      }
-    }
-  };
+    };
 
     const channel = new BroadcastChannel('attract_mode_sync');
-    channel.onmessage = (event) => handleAudioMessage(event.data);
-    const handlePostMessage = (event) => handleAudioMessage(event.data);
+    channel.onmessage = (event) => handleMessage(event.data);
+    
+    const handlePostMessage = (event) => {
+      if (event.data && (event.data.type === 'VIEW_CHANGED' || event.data.type === 'SOUND_TOGGLE')) {
+        handleMessage(event.data);
+      }
+    };
     window.addEventListener('message', handlePostMessage);
 
     return () => {
+      console.log('🎵 ERDashboard: Cleaning up message listeners');
       channel.close();
       window.removeEventListener('message', handlePostMessage);
     };
-  }, [isAttractMode]);
+  }, []); // EMPTY DEPENDENCY - RUN ONCE ONLY
 
-  // Toggle audio mute/unmute
-  const toggleAudio = async () => {
-    const newAudioState = !audioEnabled;
-    setAudioEnabled(newAudioState);
-    audioEnabledRef.current = newAudioState; // keep ref in sync
-    
-    if (videoRef.current) {
-      videoRef.current.muted = !newAudioState;
-      if (newAudioState) {
-        setShowAudioPrompt(false);
-        try {
-          await videoRef.current.play();
-        } catch (error) {
-          console.log('Audio autoplay failed, keeping muted');
-          setAudioEnabled(false);
+  // Initialize map and markers
+  useEffect(() => {
+    if (mapRef.current && !mapInstanceRef.current) {
+      const map = L.map(mapRef.current).setView([MAP_CENTER.lat, MAP_CENTER.lng], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+      mapInstanceRef.current = map;
+    }
+  }, []);
+
+  // Update markers separately without reinitializing map
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+
+    // Clear existing markers and circles only
+    mapInstanceRef.current.eachLayer((layer) => {
+      if (layer instanceof L.Marker || layer instanceof L.Circle) {
+        mapInstanceRef.current.removeLayer(layer);
+      }
+    });
+
+    // Add hospital marker
+    const hospitalIcon = L.divIcon({
+      html: '<div style="background: white; border: 2px solid #007bff; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(0, 123, 255, 0.8);">🏥</div>',
+      className: 'hospital-marker',
+      iconSize: [35, 35]
+    });
+    L.marker([hospitalLocation.lat, hospitalLocation.lng], { icon: hospitalIcon })
+      .addTo(mapInstanceRef.current)
+      .bindPopup('Hospital Emergency Department - Barcelona');
+
+    // Add patient/ambulance markers
+    patients.forEach(patient => {
+      if (patient.location) {
+        const isLeaving = patient.status === 'LEFT_AMA';
+        const isCheckedIn = patient.status === 'CHECKED_IN';
+        
+        if (!isCheckedIn && !isLeaving) {
+          // Determine ambulance color based on ESI level
+          let ambulanceColor = '#dc3545'; // Default red
+          if (patient.esi === 2) {
+            ambulanceColor = '#FD7E14'; // Orange for ESI-2 (Urgent)
+          } else if (patient.esi === 3) {
+            ambulanceColor = '#FFC107'; // Yellow for ESI-3 (Moderate)
+          }
+          
+          const ambulanceMarker = L.divIcon({
+            html: `<div style="background: white; border: 2px solid ${ambulanceColor}; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px ${ambulanceColor};">🚑</div>`,
+            className: 'ambulance-marker',
+            iconSize: [30, 30]
+          });
+          L.marker([patient.location.lat, patient.location.lng], { icon: ambulanceMarker })
+            .addTo(mapInstanceRef.current)
+            .bindPopup(`${patient.name}<br/>ESI-${patient.esi}<br/>ETA: ${patient.eta}<br/>${patient.transport}`);
+        } else if (isLeaving) {
+          const patientMarker = L.divIcon({
+            html: '<div style="background: white; border: 2px solid #FF6B35; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(255, 107, 53, 0.8);">🚶</div>',
+            className: 'patient-marker',
+            iconSize: [30, 30]
+          });
+          L.marker([patient.location.lat, patient.location.lng], { icon: patientMarker })
+            .addTo(mapInstanceRef.current)
+            .bindPopup(`${patient.name}<br/>LEFT AMA<br/>Contact: ${patient.phoneNumber}`);
         }
       }
+    });
+
+    // Add geofence circle if needed
+    if (showGeofenceCircle) {
+      L.circle([hospitalLocation.lat, hospitalLocation.lng], {
+        color: '#00d4ff',
+        fillColor: '#00d4ff',
+        fillOpacity: 0.1,
+        radius: 1000
+      }).addTo(mapInstanceRef.current);
     }
-  };
+  }, [hospitalLocation, patients, showGeofenceCircle]);
 
   // Mock patient ETA updates with location movement
   useEffect(() => {
@@ -492,85 +492,6 @@ const ERDashboard = () => {
     }
   }, [patients]);
 
-  // Initialize map and markers
-  useEffect(() => {
-    if (mapRef.current && !mapInstanceRef.current) {
-      const map = L.map(mapRef.current).setView([MAP_CENTER.lat, MAP_CENTER.lng], 10);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-      }).addTo(map);
-      mapInstanceRef.current = map;
-    }
-  }, []);
-
-  // Update markers separately without reinitializing map
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-
-    // Clear existing markers and circles only
-    mapInstanceRef.current.eachLayer((layer) => {
-      if (layer instanceof L.Marker || layer instanceof L.Circle) {
-        mapInstanceRef.current.removeLayer(layer);
-      }
-    });
-
-    // Add hospital marker
-    const hospitalIcon = L.divIcon({
-      html: '<div style="background: white; border: 2px solid #007bff; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(0, 123, 255, 0.8);">🏥</div>',
-      className: 'hospital-marker',
-      iconSize: [35, 35]
-    });
-    L.marker([hospitalLocation.lat, hospitalLocation.lng], { icon: hospitalIcon })
-      .addTo(mapInstanceRef.current)
-      .bindPopup('Hospital Emergency Department - Barcelona');
-
-    // Add patient/ambulance markers
-    patients.forEach(patient => {
-      if (patient.location) {
-        const isLeaving = patient.status === 'LEFT_AMA';
-        const isCheckedIn = patient.status === 'CHECKED_IN';
-        
-        if (!isCheckedIn && !isLeaving) {
-          // Determine ambulance color based on ESI level
-          let ambulanceColor = '#dc3545'; // Default red
-          if (patient.esi === 2) {
-            ambulanceColor = '#FD7E14'; // Orange for ESI-2 (Urgent)
-          } else if (patient.esi === 3) {
-            ambulanceColor = '#FFC107'; // Yellow for ESI-3 (Moderate)
-          }
-          
-          const ambulanceMarker = L.divIcon({
-            html: `<div style="background: white; border: 2px solid ${ambulanceColor}; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px ${ambulanceColor};">🚑</div>`,
-            className: 'ambulance-marker',
-            iconSize: [30, 30]
-          });
-          L.marker([patient.location.lat, patient.location.lng], { icon: ambulanceMarker })
-            .addTo(mapInstanceRef.current)
-            .bindPopup(`${patient.name}<br/>ESI-${patient.esi}<br/>ETA: ${patient.eta}<br/>${patient.transport}`);
-        } else if (isLeaving) {
-          const patientMarker = L.divIcon({
-            html: '<div style="background: white; border: 2px solid #FF6B35; border-radius: 50%; padding: 2px; box-shadow: 0 0 8px rgba(255, 107, 53, 0.8);">🚶</div>',
-            className: 'patient-marker',
-            iconSize: [30, 30]
-          });
-          L.marker([patient.location.lat, patient.location.lng], { icon: patientMarker })
-            .addTo(mapInstanceRef.current)
-            .bindPopup(`${patient.name}<br/>LEFT AMA<br/>Contact: ${patient.phoneNumber}`);
-        }
-      }
-    });
-
-    // Add geofence circle if needed
-    if (showGeofenceCircle) {
-      L.circle([hospitalLocation.lat, hospitalLocation.lng], {
-        color: '#00d4ff',
-        fillColor: '#00d4ff',
-        fillOpacity: 0.1,
-        radius: 1000
-      }).addTo(mapInstanceRef.current);
-    }
-  }, [hospitalLocation, patients, showGeofenceCircle]);
-
   const getESIColor = (esi) => {
     switch(esi) {
       case 1: return '#DC3545';
@@ -615,8 +536,7 @@ const ERDashboard = () => {
 
   return (
     <div className="er-dashboard">
-      {/* Background Video - Timer Controlled */}
-      {/* Static background in standalone mode, video in presentation/iframe mode */}
+      {/* Background - Static image in standalone mode, video in presentation/iframe mode */}
       {isInIframe ? (
         <video
           ref={videoRef}
@@ -624,7 +544,16 @@ const ERDashboard = () => {
           muted
           playsInline
           preload="auto"
-          style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', objectFit: 'cover', zIndex: -1 }}
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100vw', 
+            height: '100vh', 
+            objectFit: 'cover', 
+            zIndex: -1,
+            transition: 'opacity 300ms ease-in-out'
+          }}
         />
       ) : (
         <img
@@ -634,117 +563,13 @@ const ERDashboard = () => {
         />
       )}
       
-      
-      
-      {/* Attribution Button */}
-      <button
-        onClick={() => setShowAttribution(!showAttribution)}
-        style={{
-          position: 'fixed',
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0, 0, 0, 0.6)',
-          color: 'white',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          borderRadius: '4px',
-          padding: '5px 10px',
-          fontSize: '0.7rem',
-          cursor: 'pointer',
-          zIndex: 16
-        }}
-      >
-        ℹ️ Video Attribution
-      </button>
-
-      {/* Attribution Popup */}
-      {showAttribution && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '45px',
-            left: '10px',
-            background: 'rgba(255, 255, 255, 0.95)',
-            border: '2px solid #007bff',
-            borderRadius: '8px',
-            padding: '15px',
-            maxWidth: '350px',
-            zIndex: 17,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-            fontSize: '0.75rem',
-            color: '#000'
-          }}
-        >
-          <button
-            onClick={() => setShowAttribution(false)}
-            style={{
-              position: 'absolute',
-              top: '5px',
-              right: '10px',
-              background: 'none',
-              border: 'none',
-              fontSize: '1.2rem',
-              cursor: 'pointer',
-              color: '#666'
-            }}
-          >
-            ×
-          </button>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Video Source:</div>
-          <div>Video generated by Oliver Holland using Google Gemini (Veo 3.1), 23 February 2026, using the prompt: "Create a 10 second video of a hospital Emergency Room from the stationary camera perspective of just inside the entrance door. Don't focus on any specific individuals or interactions"</div>
-        </div>
-      )}
-      
-      {/* Demo Banner - Only show in attract mode */}
-      {isAttractMode && (
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: 'rgba(0, 0, 0, 0.3)',
-          color: 'white',
-          padding: '15px 20px',
-          fontSize: '0.75rem',
-          lineHeight: '1.4',
-          zIndex: 15,
-          textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)'
-        }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '0.8rem' }}>Healthcare Enhancements using Network APIs</div>
-          <div>A demo of healthcare enhancement solutions using CAMARA Network APIs and aggregators. Specifically:</div>
-          <ul style={{ margin: '5px 0', paddingLeft: '15px' }}>
-            <li>Automated patient registration, tracking of their transport and (in advance) arrival/care planning for emergency medical transport in a case of a medical emergency.</li>
-            <li>Monitoring for abscondment from the hospital, and abscondment management.</li>
-            <li>Outpatient monitoring for patients with chronic conditions.</li>
-          </ul>
-          {isInIframe && (
-            <button
-              onClick={() => window.parent.postMessage({ type: 'TRY_NOW' }, '*')}
-              style={{
-                marginTop: '8px',
-                background: 'rgba(0, 123, 255, 0.85)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.6)',
-                borderRadius: '20px',
-                padding: '5px 16px',
-                fontSize: '0.75rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                textShadow: 'none'
-              }}
-            >
-              ▶ Try Now
-            </button>
-          )}
-        </div>
-      )}
-      
-      {/* Dashboard - shown in standalone mode OR as overlay on frozen video in presentation */}
+      {/* Dashboard - shown in standalone mode OR as overlay on video in presentation */}
       {(!isAttractMode || isInIframe) && (
         <div
           className="monitor-screen"
           style={isInIframe ? { 
             opacity: showPresentationOverlay ? 0.72 : 0, 
-            transition: `opacity ${PRESENTATION_CONFIG.overlayFadeInMs}ms ease-in-out`,
+            transition: 'opacity 800ms ease-in-out',
             pointerEvents: 'none' 
           } : undefined}
         >
@@ -810,7 +635,6 @@ const ERDashboard = () => {
                                     className="checkin-button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      console.log('Check-in clicked for:', sortedPatients[0].name);
                                       handleCheckIn(sortedPatients[0]);
                                     }}
                                   >
@@ -869,7 +693,6 @@ const ERDashboard = () => {
                                       className="checkin-button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        console.log('Check-in clicked for:', sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex].name);
                                         handleCheckIn(sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex]);
                                       }}
                                     >
@@ -906,6 +729,7 @@ const ERDashboard = () => {
                         )}
                       </>
                     )}
+                    
                     {/* Current Patient Alert */}
                     {sortedPatients.length > 0 && sortedPatients[currentPatientIndex === 0 ? 1 : currentPatientIndex] && (
                       <div className="alert-panel" style={{ marginTop: '0.5rem' }}>
@@ -948,16 +772,7 @@ const ERDashboard = () => {
                 <div className="er-sidebar">
                   <div className="map-panel">
                     <h3>Live Patient Tracking</h3>
-                    {isInIframe ? (
-                      <iframe
-                        src="https://www.openstreetmap.org/export/embed.html?bbox=1.9%2C41.25%2C2.35%2C41.55&layer=mapnik&marker=41.387%2C2.118"
-                        style={{ width: '100%', height: 'clamp(200px, 25vh, 350px)', borderRadius: '4px', border: 'none', display: 'block' }}
-                        title="Barcelona map"
-                        loading="eager"
-                      />
-                    ) : (
-                      <div ref={mapRef} style={{ height: 'clamp(200px, 25vh, 350px)', width: '100%', borderRadius: '4px' }}></div>
-                    )}
+                    <div ref={mapRef} style={{ height: 'clamp(150px, 20vh, 250px)', width: '100%', borderRadius: '4px' }}></div>
                   </div>
 
                   <div className="resource-panel">
@@ -985,207 +800,208 @@ const ERDashboard = () => {
               </div>
             </div>
           </div>
-        {/* Patient Detail Card Popup within Monitor */}
-        {showDetailCard && selectedPatient && !isInIframe && (
-          <div className="patient-detail-popup" style={{
-            position: 'absolute',
-            top: '5%',
-            left: '10%',
-            width: '80%',
-            height: '90%',
-            backgroundColor: 'rgba(255, 255, 255, 0.98)',
-            border: '2px solid #007bff',
-            borderRadius: '8px',
-            padding: '0.5rem',
-            zIndex: 200,
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-            overflowY: 'auto'
-          }}>
-            <button 
-              onClick={(e) => {
-              e.stopPropagation();
-              setShowDetailCard(false);
-            }}
-              style={{
-                position: 'absolute',
-                top: '10px',
-                right: '15px',
-                background: 'none',
-                border: 'none',
-                fontSize: 'clamp(1rem, 1.2vw, 1.2rem)',
-                cursor: 'pointer',
-                color: '#666',
-                fontWeight: 'bold'
-              }}
-            >
-              ×
-            </button>
-            
-            <h2 style={{ marginTop: 0, color: '#000', fontSize: 'clamp(0.7rem, 1vw, 1.1rem)', fontWeight: 'bold', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>
-              {selectedPatient.name} ({selectedPatient.age})
-              {!selectedPatient.phoneNumber.startsWith('mock-') && selectedPatient.status === 'ARRIVED' && (
-                <button 
-                  className="checkin-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCheckIn(selectedPatient);
-                  }}
-                  style={{ marginLeft: '1rem' }}
-                >
-                  Check-In ✓
-                </button>
-              )}
-            </h2>
-            
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                  <div>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>ESI Level:</strong>
-                    <p style={{ backgroundColor: '#ffe6e6', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: getESIColor(selectedPatient.esi || 3) }}>
-                      ESI-{selectedPatient.esi || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Status:</strong>
-                    <p style={{ backgroundColor: '#e3f2fd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: getStatusBadge(selectedPatient.status || 'UNKNOWN') }}>
-                      {selectedPatient.status || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>ETA:</strong>
-                    <p style={{ backgroundColor: '#fff3e0', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.eta || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Distance:</strong>
-                    <p style={{ backgroundColor: '#f3e5f5', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.distance || 'N/A'}
-                    </p>
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Transport:</strong>
-                    <p style={{ backgroundColor: '#e8f5e9', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.transport || 'N/A'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
-                  <p style={{ backgroundColor: '#f8f9fa', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                    {selectedPatient.complaint || 'N/A'}
-                  </p>
-                </div>
-                
-                <div style={{ marginBottom: '0.4rem' }}>
-                  <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
-                  <p style={{ backgroundColor: '#e8f4f8', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                    {selectedPatient.vitals || 'N/A'}
-                  </p>
-                </div>
-              </div>
+          
+          {/* Patient Detail Card Popup within Monitor */}
+          {showDetailCard && selectedPatient && !isInIframe && (
+            <div className="patient-detail-popup" style={{
+              position: 'absolute',
+              top: '3%',
+              left: '3%',
+              width: '94%',
+              height: '94%',
+              backgroundColor: 'rgba(255, 255, 255, 0.98)',
+              border: '2px solid #007bff',
+              borderRadius: '6px',
+              padding: '0.2rem',
+              zIndex: 200,
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+              overflowY: 'auto'
+            }}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDetailCard(false);
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '12px',
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 'clamp(1rem, 1.2vw, 1.2rem)',
+                  cursor: 'pointer',
+                  color: '#666',
+                  fontWeight: 'bold'
+                }}
+              >
+                ×
+              </button>
               
-              <div style={{ flex: 1 }}>
-                {selectedPatient.medicalHistory && (
-                  <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
-                    <p style={{ backgroundColor: '#fff3cd', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.medicalHistory}
-                    </p>
-                  </div>
+              <h2 style={{ marginTop: 0, marginBottom: '0.3rem', color: '#000', fontSize: 'clamp(0.7rem, 1vw, 1.1rem)', fontWeight: 'bold' }}>
+                {selectedPatient.name} ({selectedPatient.age})
+                {!selectedPatient.phoneNumber.startsWith('mock-') && selectedPatient.status === 'ARRIVED' && (
+                  <button 
+                    className="checkin-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCheckIn(selectedPatient);
+                    }}
+                    style={{ marginLeft: '1rem' }}
+                  >
+                    Check-In ✓
+                  </button>
                 )}
-                
-                {selectedPatient.specialistsNeeded && selectedPatient.specialistsNeeded.length > 0 && (
-                  <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Specialists Required:</strong>
-                    <p style={{ backgroundColor: '#e1f5fe', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.specialistsNeeded.join(', ')}
-                    </p>
-                  </div>
-                )}
-                
-                {selectedPatient.equipmentNeeded && selectedPatient.equipmentNeeded.length > 0 && (
-                  <div style={{ marginBottom: '0.4rem' }}>
-                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Equipments Required:</strong>
-                    <p style={{ backgroundColor: '#fce4ec', padding: '0.2rem', borderRadius: '3px', margin: '0.1rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
-                      {selectedPatient.equipmentNeeded.join(', ')}
-                    </p>
-                  </div>
-                )}
-                
-                {selectedPatient.aiSummary && (
-                  <div style={{ 
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-                    padding: '0.3rem', 
-                    borderRadius: '4px',
-                    border: '2px solid #ffd700',
-                    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                  }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.2rem',
-                      marginBottom: '0.2rem',
-                      paddingBottom: '0.15rem',
-                      borderBottom: '1px solid rgba(255, 215, 0, 0.3)'
-                    }}>
-                      <span style={{ fontSize: '0.9rem' }}>🤖</span>
-                      <strong style={{ 
-                        fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', 
-                        fontWeight: 'bold',
-                        color: '#ffd700',
-                        textShadow: '0 0 10px rgba(255, 215, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)',
-                        letterSpacing: '0.5px'
-                      }}>AI ANALYSIS</strong>
+              </h2>
+              
+              <div style={{ display: 'flex', gap: '0.8rem' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.15rem', marginBottom: '0.15rem' }}>
+                    <div>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>ESI Level:</strong>
+                      <p style={{ backgroundColor: '#ffe6e6', padding: '0.08rem', borderRadius: '3px', margin: '0.01rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: getESIColor(selectedPatient.esi || 3) }}>
+                        ESI-{selectedPatient.esi || 'N/A'}
+                      </p>
                     </div>
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.1)', 
-                      padding: '0.2rem', 
-                      borderRadius: '3px',
-                      backdropFilter: 'blur(10px)'
-                    }}>
-                      <div style={{ marginBottom: '0.2rem' }}>
-                        <strong style={{ 
-                          fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)',
-                          color: '#fff',
-                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
-                        }}>Diagnosis:</strong>
-                        <p style={{ 
-                          margin: '0.05rem 0 0 0', 
-                          fontSize: 'clamp(0.5rem, 0.75vw, 0.8rem)', 
-                          fontWeight: 'normal', 
-                          color: '#fff',
-                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
-                        }}>
-                          {selectedPatient.aiSummary.diagnosis}
-                        </p>
-                      </div>
-                      <div>
-                        <strong style={{ 
-                          fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)',
-                          color: '#fff',
-                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
-                        }}>Recommended Action:</strong>
-                        <p style={{ 
-                          margin: '0.05rem 0 0 0', 
-                          fontSize: 'clamp(0.5rem, 0.75vw, 0.8rem)', 
-                          fontWeight: 'normal', 
-                          color: '#fff',
-                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
-                        }}>
-                          {selectedPatient.aiSummary.recommendedAction}
-                        </p>
-                      </div>
+                    <div>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Status:</strong>
+                      <p style={{ backgroundColor: '#e3f2fd', padding: '0.08rem', borderRadius: '3px', margin: '0.01rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: getStatusBadge(selectedPatient.status || 'UNKNOWN') }}>
+                        {selectedPatient.status || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>ETA:</strong>
+                      <p style={{ backgroundColor: '#fff3e0', padding: '0.08rem', borderRadius: '3px', margin: '0.01rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                        {selectedPatient.eta || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Distance:</strong>
+                      <p style={{ backgroundColor: '#f3e5f5', padding: '0.08rem', borderRadius: '3px', margin: '0.01rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                        {selectedPatient.distance || 'N/A'}
+                      </p>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold', display: 'block' }}>Transport:</strong>
+                      <p style={{ backgroundColor: '#e8f5e9', padding: '0.08rem', borderRadius: '3px', margin: '0.01rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                        {selectedPatient.transport || 'N/A'}
+                      </p>
                     </div>
                   </div>
-                )}
+                  
+                  <div style={{ marginBottom: '0.15rem' }}>
+                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Chief Complaint:</strong>
+                    <p style={{ backgroundColor: '#f8f9fa', padding: '0.08rem', borderRadius: '3px', margin: '0.03rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                      {selectedPatient.complaint || 'N/A'}
+                    </p>
+                  </div>
+                  
+                  <div style={{ marginBottom: '0.15rem' }}>
+                    <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Vitals:</strong>
+                    <p style={{ backgroundColor: '#e8f4f8', padding: '0.08rem', borderRadius: '3px', margin: '0.03rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                      {selectedPatient.vitals || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div style={{ flex: 1 }}>
+                  {selectedPatient.medicalHistory && (
+                    <div style={{ marginBottom: '0.3rem' }}>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Medical History:</strong>
+                      <p style={{ backgroundColor: '#fff3cd', padding: '0.15rem', borderRadius: '3px', margin: '0.08rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                        {selectedPatient.medicalHistory}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {selectedPatient.specialistsNeeded && selectedPatient.specialistsNeeded.length > 0 && (
+                    <div style={{ marginBottom: '0.3rem' }}>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Specialists Required:</strong>
+                      <p style={{ backgroundColor: '#e1f5fe', padding: '0.15rem', borderRadius: '3px', margin: '0.08rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                        {selectedPatient.specialistsNeeded.join(', ')}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {selectedPatient.equipmentNeeded && selectedPatient.equipmentNeeded.length > 0 && (
+                    <div style={{ marginBottom: '0.3rem' }}>
+                      <strong style={{ fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', color: '#000', fontWeight: 'bold' }}>Equipment Required:</strong>
+                      <p style={{ backgroundColor: '#fce4ec', padding: '0.15rem', borderRadius: '3px', margin: '0.08rem 0', fontSize: 'clamp(0.55rem, 0.8vw, 0.85rem)', fontWeight: 'normal', color: '#000' }}>
+                        {selectedPatient.equipmentNeeded.join(', ')}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {selectedPatient.aiSummary && (
+                    <div style={{ 
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                      padding: '0.15rem', 
+                      borderRadius: '4px',
+                      border: '2px solid #ffd700',
+                      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.08rem',
+                        marginBottom: '0.08rem',
+                        paddingBottom: '0.08rem',
+                        borderBottom: '1px solid rgba(255, 215, 0, 0.3)'
+                      }}>
+                        <span style={{ fontSize: '0.8rem' }}>🤖</span>
+                        <strong style={{ 
+                          fontSize: 'clamp(0.5rem, 0.7vw, 0.75rem)', 
+                          fontWeight: 'bold',
+                          color: '#ffd700',
+                          textShadow: '0 0 10px rgba(255, 215, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)',
+                          letterSpacing: '0.5px'
+                        }}>AI ANALYSIS</strong>
+                      </div>
+                      <div style={{ 
+                        background: 'rgba(255, 255, 255, 0.1)', 
+                        padding: '0.08rem', 
+                        borderRadius: '3px',
+                        backdropFilter: 'blur(10px)'
+                      }}>
+                        <div style={{ marginBottom: '0.08rem' }}>
+                          <strong style={{ 
+                            fontSize: 'clamp(0.5rem, 0.7vw, 0.75rem)',
+                            color: '#fff',
+                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                          }}>Diagnosis:</strong>
+                          <p style={{ 
+                            margin: '0.01rem 0 0 0', 
+                            fontSize: 'clamp(0.45rem, 0.65vw, 0.7rem)', 
+                            fontWeight: 'normal', 
+                            color: '#fff',
+                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                          }}>
+                            {selectedPatient.aiSummary.diagnosis}
+                          </p>
+                        </div>
+                        <div>
+                          <strong style={{ 
+                            fontSize: 'clamp(0.5rem, 0.7vw, 0.75rem)',
+                            color: '#fff',
+                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                          }}>Recommended Action:</strong>
+                          <p style={{ 
+                            margin: '0.01rem 0 0 0', 
+                            fontSize: 'clamp(0.45rem, 0.65vw, 0.7rem)', 
+                            fontWeight: 'normal', 
+                            color: '#fff',
+                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                          }}>
+                            {selectedPatient.aiSummary.recommendedAction}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       )}
     </div>
   );

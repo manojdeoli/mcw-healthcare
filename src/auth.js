@@ -94,7 +94,7 @@ class AuthService {
             throw new Error('Must call getClientCredentials and getEndpoints first');
         }
 
-        const port = window.location.port || '3003';
+        const port = window.location.port || '3000';
         const redirectUri = `http://localhost:${port}/redirect`;
 
         const params = new URLSearchParams({
@@ -131,7 +131,8 @@ class AuthService {
             console.log('📤 Token endpoint:', this.endpoints.token_endpoint);
             console.log('📤 Token data:', tokenData);
             
-            const response = await fetch('http://localhost:3003/api/token-exchange', {
+            const currentPort = window.location.port || '3000';
+            const response = await fetch(`http://localhost:${currentPort}/api/token-exchange`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
