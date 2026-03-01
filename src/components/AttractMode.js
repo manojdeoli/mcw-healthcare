@@ -132,7 +132,7 @@ const AttractMode = () => {
   // Hotel detection
   useEffect(() => {
     const checkHotelKiosk = async () => {
-      const ports = [4001, 4002];
+      const ports = [4001, 4002, 3005, 3006];
       for (const port of ports) {
         try {
           const check = await fetch(`http://localhost:${port}/hotel_logo.png`, { cache: 'no-store' });

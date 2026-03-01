@@ -1687,8 +1687,9 @@ function App() {
           </div>
         </div>
       }
-      <header className="header">
+      <header className="header" style={{ position: 'relative' }}>
         <h1><a href="/" className="header-link">Healthcare Use Case Demo</a></h1>
+        <img src="/Wipro_Secondary_Logo.png" alt="Wipro" style={{ position: 'absolute', top: '50%', right: '16px', transform: 'translateY(-50%)', height: '72px', objectFit: 'contain' }} />
       </header>
 
       <nav className="screen-nav" style={{ background: '#f0f0f0', padding: '10px', textAlign: 'center', marginBottom: '20px' }}>

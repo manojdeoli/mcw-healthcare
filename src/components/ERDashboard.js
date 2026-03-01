@@ -536,6 +536,7 @@ const ERDashboard = () => {
 
   return (
     <div className="er-dashboard">
+      <img src="/Wipro_Secondary_Logo.png" alt="Wipro" style={{ position: 'fixed', top: '12px', right: '16px', height: '80px', objectFit: 'contain', zIndex: 100 }} />
       {/* Background - Static image in standalone mode, video in presentation/iframe mode */}
       {isInIframe ? (
         <video

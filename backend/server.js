@@ -120,9 +120,5 @@ if (process.env.NODE_ENV === 'production') {
 
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('📱 React app: http://localhost:3000');
-    console.log('🔧 API server: http://localhost:3003');
-  }
+  console.log(`Server running on port ${PORT}`);
 });

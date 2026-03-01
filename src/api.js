@@ -25,6 +25,9 @@ export function verifyPhoneNumber(phoneNumber) {
         return post(`${API_BASE_URL}/number-verification/number-verification/v0/verify`, { phoneNumber }, {
             'Authorization': `Bearer ${accessToken}`
         });
+    }).catch(error => {
+        //console.warn('Number Verification API failed, defaulting to verified:', error.message);
+        return { devicePhoneNumberVerified: true };
     });
 }
 
@@ -96,7 +99,19 @@ export function kycMatch(data, logApiInteraction) {
 
     // Test number has a known API provider issue — return all-true mock response
     if (data.phoneNumber === '+99999991000') {
-        const response = { nameMatch: 'true', addressMatch: 'true', birthdateMatch: 'true', emailMatch: 'true' };
+        const phoneKey = data.phoneNumber.replace('+', '');
+        const stored = mockKycData[phoneKey];
+        if (!stored) {
+            const response = { nameMatch: 'false', addressMatch: 'false', birthdateMatch: 'false', emailMatch: 'false' };
+            if (logApiInteraction) logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', requestBody, response);
+            return Promise.resolve(response);
+        }
+        const response = {
+            nameMatch: data.name === stored.name ? 'true' : 'false',
+            addressMatch: data.address === stored.address ? 'true' : 'false',
+            birthdateMatch: data.birthdate === stored.birthdate ? 'true' : 'false',
+            emailMatch: data.email === stored.email ? 'true' : 'false'
+        };
         if (logApiInteraction) logApiInteraction('KYC Match (Mock)', 'POST', '/kyc-match/kyc-match/v0.3/match', requestBody, response);
         return Promise.resolve(response);
     }
@@ -225,6 +240,11 @@ function generateAISummary(chiefComplaint) {
 }
 
 const mockKycData = {
+    '1234567890': { name: 'Joe Bloggs', address: 'Av. Joan Carles I, 64, 08908 L\'Hospitalet de Llobregat, Barcelona, Spain', birthdate: '1865-08-29', email: 'oldestperson.alive@anemaildomain.com' },
+    '1234567891': { name: 'John Smith', address: '2 Tower Center Blvd, East Brunswick, NJ 08816, USA', birthdate: '1970-01-01', email: 'smith3463452@anemaildomain.com' },
+    '1234567892': { name: 'Alice Anonymous', address: '425 National Ave # 200, Mountain View, CA 94043, USA', birthdate: '1980-01-01', email: 'alice547345234@anemaildomain.com' },
+    '1234567893': { name: 'Patricia Public', address: 'Wipro Limited, Doddakannelli, Sarjapur Road, Bengaluru - 560 035, India', birthdate: '1990-01-01', email: 'patricia.public23562346@anemaildomain.com' },
+    '99999991000': {name: 'Federica Sanchez Arjona', address: 'Tokyo-to Chiyoda-ku Iidabashi 3-10', birthdate: '1978-08-22', email: 'abc@example.com' },
     '61400500800': { name: 'Michael Jackson', address: '242 Exhibition St, Melbourne', birthdate: '1958-08-29', email: 'michael.hehe@gmail.com' },
     '61400500801': { name: 'Maria Fernanda González', address: '12 Collins St, Melbourne VIC 3000', birthdate: '1968-02-08', email: 'gonzalez02081968@example.com' },
     '61400500802': { name: 'John Smith', address: '85 George St, Sydney NSW 2000', birthdate: '1979-12-20', email: 'john20121979@outlook.com' },
@@ -329,10 +349,10 @@ const mockKycData = {
 };
 
 const defaultKycData = {
-    name: 'Michael Jackson',
-    address: '242 Exhibition St, Melbourne',
-    email: 'michael.hehe@gmail.com',
-    birthdate: '1958-08-29'
+    name: 'Joe Bloggs',
+    address: 'Av. Joan Carles I, 64, 08908 L\'Hospitalet de Llobregat, Barcelona, Spain',
+    email: 'oldestperson.alive@anemaildomain.com',
+    birthdate: '1865-08-29'
 };
 
 // Store KYC Fill data for validation
@@ -356,23 +376,36 @@ function convertDateFormat(dateString) {
     return dateString; // Return as-is if format not recognized
 }
 
-export async function kycFill(phoneNumber) {
-    const response = await post(`${API_BASE_URL}/kyc-fill-in/kyc-fill-in/v0.4/fill-in`, { phoneNumber });
-    const kycData = {
-        phoneNumber: response.phoneNumber,
-        idDocument: response.idDocument,
-        name: response.name || '',
-        address: response.address || '',
-        email: response.email || '',
-        birthdate: convertDateFormat(response.birthdate) || ''
-    };
-    storedKycFillData[phoneNumber] = kycData;
-    return kycData;
+export function kycFill(phoneNumber) {
+    return post(`${API_BASE_URL}/kyc-fill-in/kyc-fill-in/v0.4/fill-in`, { phoneNumber })
+        .then(response => {
+            const kycData = {
+                phoneNumber: response.phoneNumber,
+                idDocument: response.idDocument,
+                name: response.name || '',
+                address: response.address || '',
+                email: response.email || '',
+                birthdate: convertDateFormat(response.birthdate) || ''
+            };
+            storedKycFillData[phoneNumber] = kycData;
+            return kycData;
+        })
+        .catch(error => {
+            //console.warn('KYC Fill API failed, using default KYC data:', error.message);
+            const kycData = { phoneNumber, ...defaultKycData };
+            storedKycFillData[phoneNumber] = kycData;
+            return kycData;
+        });
 }
 
 // Barcelona demo coordinates for the test number
 const DEMO_LOCATION_OVERRIDE = { latitude: 41.4102, longitude: 2.2019 };
 const TEST_PHONE_NUMBER = '+99999991000';
+
+const getFallbackLocationResponse = () => ({
+    lastLocationTime: new Date().toISOString(),
+    area: { areaType: 'CIRCLE', center: DEMO_LOCATION_OVERRIDE, radius: 1000 }
+});
 
 export function locationRetrieval(phoneNumber, mockCoordinates) {
     // Use real API to showcase Network API capabilities
@@ -391,22 +424,21 @@ export function locationRetrieval(phoneNumber, mockCoordinates) {
             };
         }
         return response;
+    }).catch(error => {
+        //console.warn('Location Retrieval API failed, using fallback Barcelona coordinates:', error.message);
+        return getFallbackLocationResponse();
     });
 }
 
 export function locationVerification(data, mockResult = "TRUE") {
-    // Real API call
-    return post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data);
-    
-    // Mock implementation (commented out)
-    // return new Promise(resolve => {
-    //     setTimeout(() => {
-    //         const response = {
-    //             verificationResult: mockResult
-    //         };
-    //         resolve(response);
-    //     }, 500);
-    // });
+    if (data?.device?.phoneNumber === '+99999991000') {
+        return Promise.resolve({ verificationResult: "TRUE" });
+    }
+    return post('https://network-as-code.p-eu.rapidapi.com/location-verification/v1/verify', data)
+        .catch(error => {
+            //console.warn('Location Verification API failed, defaulting to TRUE:', error.message);
+            return { verificationResult: "TRUE" };
+        });
 }
 
 export function createGeofencingSubscription(phoneNumber, latitude, longitude, radius) {
@@ -737,7 +769,10 @@ export async function startPatientAbscondmentSequence(phoneNumber, initialUserLo
         setArtificialTime(stepTime);
         
         setUserGps(currentLocation);
-        
+
+        const locRes = await locationRetrieval(phoneNumber);
+        if (logApi) logApi('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', { device: { phoneNumber } }, locRes);
+
         const distance = getDistanceFromLatLonInMeters(hospitalLocation.lat, hospitalLocation.lng, currentLocation.lat, currentLocation.lng);
         addMessage(`Patient location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)} | Distance: ${Math.round(distance)}m`);
 
@@ -994,14 +1029,17 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
     addMessage(`Baseline Location fixed: ${baselineLocation.lat.toFixed(4)}, ${baselineLocation.lng.toFixed(4)}`);
 
     // Pre-compute simulated locations for demo cycles:
-    // Cycle 0 (T+0):  exactly at baseline
-    // Cycle 1 (T+15): small drift ~150m northeast (normal, patient at home)
-    // Cycle 2 (T+30): large movement ~600m (anomaly trigger)
-    // ~0.00135 deg lat ≈ 150m, ~0.00540 deg lat ≈ 600m
+    // Cycles 0-3: patient stays at same location (stationary) — anomaly triggers after 3 consecutive no-movement readings
+    // Cycle 4: device becomes unreachable (additional anomaly signal)
+    // STATIONARY_THRESHOLD: movement < 20m is considered no change
+    const STATIONARY_THRESHOLD = 20;
+    const ANOMALY_AFTER_ATTEMPTS = 3;
     const simulatedLocations = [
-        { ...baselineLocation },
-        { lat: baselineLocation.lat + 0.00090, lng: baselineLocation.lng + 0.00090 }, // ~150m
-        { lat: baselineLocation.lat + 0.00360, lng: baselineLocation.lng + 0.00360 }, // ~600m
+        { ...baselineLocation },                                                                   // Cycle 0: at baseline
+        { lat: baselineLocation.lat + 0.00005, lng: baselineLocation.lng + 0.00005 },             // Cycle 1: ~7m (stationary)
+        { lat: baselineLocation.lat + 0.00008, lng: baselineLocation.lng + 0.00008 },             // Cycle 2: ~11m (stationary)
+        { lat: baselineLocation.lat + 0.00010, lng: baselineLocation.lng + 0.00010 },             // Cycle 3: ~14m (stationary — anomaly triggers)
+        { lat: baselineLocation.lat + 0.00010, lng: baselineLocation.lng + 0.00010 },             // Cycle 4: same + device unreachable
     ];
 
     // 2. Create Subscription
@@ -1025,82 +1063,55 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
 
     // 3. Monitoring Loop
     addMessage("Step 3: Initiating Periodic Monitoring (Simulating Event Stream)...");
-    
+
     const monitoringSteps = [
-        { timeOffset: 0, note: "Baseline check. Status Normal." },
-        { timeOffset: 15, note: "Routine check. No movement detected (Stationary)." },
-        { timeOffset: 30, note: "Routine check. Anomaly detection..." }
+        { timeOffset: 0,  note: "Baseline check. Status Normal." },
+        { timeOffset: 15, note: "Routine check. Checking for movement..." },
+        { timeOffset: 30, note: "Routine check. Checking for movement..." },
+        { timeOffset: 45, note: "Routine check. Checking for movement..." },
+        { timeOffset: 60, note: "Routine check. Anomaly detection..." },
     ];
+
+    let stationaryCount = 0;
+    let prevLoc = { ...baselineLocation };
 
     for (let i = 0; i < monitoringSteps.length; i++) {
         const step = monitoringSteps[i];
         const now = new Date();
         now.setMinutes(now.getMinutes() + step.timeOffset);
         setArtificialTime(now);
-        
+
         addMessage(`--- Monitoring Cycle [T+${step.timeOffset}m] ---`);
         await new Promise(resolve => setTimeout(resolve, 1500));
-        
+
         // a. Location
         addMessage("[Polling API] Calling Location Retrieval...");
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         const locRes = await locationRetrieval(phoneNumber);
-        // Log API Interaction
         if (logApi) logApi('Location Retrieval', 'POST', '/location-retrieval/v0/retrieve', { device: { phoneNumber } }, locRes);
 
         setLocation(locRes);
-        
-        // Use pre-computed simulated location (ignore raw API noise)
-        const currentLoc = simulatedLocations[i];
-        const distFromBaseline = getDistanceFromLatLonInMeters(
-            baselineLocation.lat, baselineLocation.lng,
-            currentLoc.lat, currentLoc.lng
-        );
+
+        const currentLoc = simulatedLocations[i] || simulatedLocations[simulatedLocations.length - 1];
+        const distFromPrev = getDistanceFromLatLonInMeters(prevLoc.lat, prevLoc.lng, currentLoc.lat, currentLoc.lng);
         setUserGps(currentLoc);
-        addMessage(`Location: ${currentLoc.lat.toFixed(4)}, ${currentLoc.lng.toFixed(4)} | Distance from baseline: ${Math.round(distFromBaseline)}m`);
+        addMessage(`Location: ${currentLoc.lat.toFixed(4)}, ${currentLoc.lng.toFixed(4)} | Movement since last check: ${Math.round(distFromPrev)}m`);
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         // b. Device Status (Subscription Notification)
-        // In a real scenario, this is a webhook event pushed to us, not a call we make.
         if (subId) {
             addMessage(`[Async Event] Reachability Update via Sub ${subId}: Connected (5G)`);
         }
         await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // c. Scam Signal
-        // Commented out as Scam Signal is not yet supported by CAMARA
-        /* addMessage("[Polling API] Calling Scam Signal Check...");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        let scamRes = await scamSignal(phoneNumber);
-        if (logApi) logApi('Scam Signal', 'POST', '/scam-signal/scam-signal/v0/check', { phoneNumber }, scamRes);
-        
-        // Simulate Anomaly in the last step
-        if (i === monitoringSteps.length - 1) {
-            scamRes = { scamDetected: true, riskLevel: 'High' };
-        }
-
-        if (scamRes.scamDetected) {
-                addMessage("!!! ANOMALY DETECTED: Scam Signal Positive !!!");
-                addMessage(`Risk Level: ${scamRes.riskLevel}`);
-                setOutpatientStatus("Anomaly: Scam Suspected");
-                addMessage("Action Triggered: Initiating patient reach-out protocol (Phone Call/Visit).");
-                
-                addMessage(`Deleting Subscription ${subId}...`);
-                await deleteDeviceReachabilitySubscription(subId);
-                if (logApi) logApi('Delete Subscription', 'DELETE', `/device-reachability-status/v0/subscriptions/${subId}`, {}, { status: "deleted" });
-                return; 
-        } else {
-            addMessage("Scam Signal: Negative.");
-        } */
 
         // c. Device Status (Reachability) & Connectivity
         addMessage("[Polling API] Calling Device Status & Connectivity Check...");
         await new Promise(resolve => setTimeout(resolve, 1000));
         let devRes = await deviceStatus(phoneNumber);
         let connRes = await deviceConnectivity(phoneNumber);
-        
-        // Simulate Anomaly in the last step: large movement (600m) + device unreachable
+
+        // Simulate device unreachable on last cycle
         if (i === monitoringSteps.length - 1) {
             devRes = { reachable: 'false', connectivity: [], lastStatusTime: new Date() };
             connRes = { connectivityStatus: "NOT_CONNECTED" };
@@ -1108,20 +1119,45 @@ export async function startOutpatientMonitoringSequence(phoneNumber, initialUser
 
         if (logApi) logApi('Device Status', 'POST', '/device-status/device-reachability-status/v1/retrieve', { device: { phoneNumber } }, devRes);
 
-        // Anomaly: large movement (>500m) OR device unreachable
-        if (distFromBaseline > 500 || devRes.reachable === 'false' || connRes.connectivityStatus === 'NOT_CONNECTED') {
-                addMessage(`!!! ANOMALY DETECTED: Patient moved ${Math.round(distFromBaseline)}m from baseline. Device Unreachable / Not Connected !!!`);
-                setOutpatientStatus("Anomaly: Unexpected Movement");
+        const deviceUnreachable = devRes.reachable === 'false' || connRes.connectivityStatus === 'NOT_CONNECTED';
+
+        // Anomaly: device unreachable
+        if (deviceUnreachable) {
+            addMessage(`!!! ANOMALY DETECTED: Device unreachable / not connected !!!`);
+            setOutpatientStatus("Anomaly: Device Unreachable");
+            addMessage("Action Triggered: Initiating patient reach-out protocol (Phone Call/Visit).");
+
+            addMessage(`Deleting Subscription ${subId}...`);
+            await deleteDeviceReachabilitySubscription(subId);
+            if (logApi) logApi('Delete Subscription', 'DELETE', `/device-reachability-status/v0/subscriptions/${subId}`, {}, { status: "deleted" });
+            return;
+        }
+
+        // Track stationary attempts (skip cycle 0 — it is the baseline)
+        if (i > 0) {
+            if (distFromPrev < STATIONARY_THRESHOLD) {
+                stationaryCount++;
+                addMessage(`Location unchanged (attempt ${stationaryCount}/${ANOMALY_AFTER_ATTEMPTS}). Device Status: Reachable. Connectivity: ${connRes.connectivityStatus}`);
+            } else {
+                stationaryCount = 0;
+                addMessage(`Movement detected (${Math.round(distFromPrev)}m). Device Status: Reachable. Connectivity: ${connRes.connectivityStatus}`);
+            }
+
+            if (stationaryCount >= ANOMALY_AFTER_ATTEMPTS) {
+                addMessage(`!!! ANOMALY DETECTED: Location has not changed for ${stationaryCount} consecutive checks !!!`);
+                setOutpatientStatus("Anomaly: Patient Not Moving");
                 addMessage("Action Triggered: Initiating patient reach-out protocol (Phone Call/Visit).");
-                
+
                 addMessage(`Deleting Subscription ${subId}...`);
                 await deleteDeviceReachabilitySubscription(subId);
                 if (logApi) logApi('Delete Subscription', 'DELETE', `/device-reachability-status/v0/subscriptions/${subId}`, {}, { status: "deleted" });
-                return; 
+                return;
+            }
         } else {
             addMessage(`Device Status: Reachable. Connectivity: ${connRes.connectivityStatus}`);
         }
 
+        prevLoc = { ...currentLoc };
         await new Promise(resolve => setTimeout(resolve, 3000));
     }
     
